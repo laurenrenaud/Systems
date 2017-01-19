@@ -1,0 +1,21 @@
+id,orgid,name,address1,address2,city,state,zip,deleted,licensenum,locationexp,locationissue,status,districtcode,mailaddress1,mailaddress2,mailcity,mailstate,mailzip,locubi,transactionid,transactionid_original
+4,6,"Analytical 360, LLC.",31 North 1st Avenue,,Yakima,WA,98902,0,0004,1432709999,1401260399,Active Certified,Statewide,31 North 1st Avenue,,Yakima,WA,98902,603120434,122258,122258
+5,16,Confidence Analytics,14797 NE 95th St,,Redmond,WA,98052,0,0003,1434610799,1403161199,Active Certified,7A,14797 NE 95th St,,Redmond,WA,98052,603324019,122259,122259
+6,17,"True Northwest, Inc.",4139 Libby Rd. NE,,Olympia,WA,98506,0,0006,1436511599,1405061999,Active (Certified),7A,4139 Libby Rd. NE,adddress 2,Olympia,WA,98506,603178980,122260,122260
+7,20,G.O.A.T. Labs,5501 NE 109th Ct. Ste. N,,Vancouver,WA,98662,0,0008,1437634799,1406185199,Active (Certified),7A,5501 NE 109th Ct. Ste. N,,Vancouver,WA,98662,603392242,122261,122261
+8,19,The Werc Shop,15405 SE 37th Street,Suite 140,Bellevue,WA,98006,0,0001,1438757999,1407308399,Active (Certified),7A,15405 SE 37th Street,Suite 140,Bellevue,WA,98006,603410765,133774,133774
+9,22,Integrity Labs,2747 Pacific Ave SE,Suite B15,Olympia,WA,98501,0,0009,1439967599,1408517999,Active (Certified),7A,2747 Pacific Ave SE,Suite B15,Olympia,WA,98501,603364500,196715,196715
+10,23,Steep Hill Labs,720 Industry Drive,,Tukwila,WA,98188,0,0002,1440053999,1408604399,Active Certified,7A,473 Roland Way,,Oakland,CA,94621,603382343,206189,206189
+11,24,Anatek Labs,504 E. Sprague,Suite D,Spokane,WA,99202,0,0010,1440053999,1408604399,Active (Certified),7A,504 E. Sprague,Suite D,Spokane,WA,99202,601768854,206227,206227
+12,26,Testing Technologies,19834 Viking Ave. NW,Suite B,Poulsbo,WA,98370,0,0007,1440658799,1409209199,Active Certified,7A,19834 Viking Ave. NW,Suite B,Poulsbo,WA,98370,603273920,268547,268547
+13,21,Phytalab,13615 100th Ave. NE,,Kirkland,WA,980345234,0,0011,1441349999,1409900399,Certification Suspended,7A,13615 100th Ave. NE,,Kirkland,WA,980345234,603092833,309281,309281
+14,28,Green Grower Labs,124 E. Rowan Ave.,Ste B,Spokane,WA,99207,0,0012,1442991599,1411541999,Active Certified,7A,,,,,,603400231,441197,441197
+15,29,CannaSafe Analytics,2305 NE Hopkins Court,,Pullman,WA,99163,0,0005,1446623999,1415174399,Certification Suspended,7A,2305 NE Hopkins Court,,Pullman,WA,99163,603416677,776907,776907
+17,33,Dragon Analyitcal Laboratory,530A-1 Ronlee Lane NW,,Olympia,WA,98502,0,0013,1452326399,1420876799,Active Certified,7A,2818 Madrona Beach Rd NW,,Olympia,WA,98502,602957983,1522964,1522964
+18,34,Trace Analytics,908 N Howard St,Ste 101,Spokane,WA,99201,0,0014,1457078399,1425542399,Active Certified,7A,908 N Howard St,Ste 101,Spokane,WA,99201,603431425,2645644,2645644
+23,39,Peak Analytics Laboratory Testing Services,5373 Guide Meridian,Ste F-201,Bellingham,WA,98226,0,0015,1480579199,1447833599,Active Certified,7G,5373 Guide Meridian,Ste F-201,Bellingham,WA,98226,603482763,14582164,14582164
+33,48,FloraLabs Inc,11323 Commando Rd W,Suite 224,Everett,WA,98204,0,0016,1485935999,1452844799,Active Certified,7I,1752 NW Market St,Suite 225,Seattle,WA,98107,603485016,18578386,18578386
+36,50,HD Analytics,9626 32nd St SE,Unit B  Ste 100,Lake Stevens,WA,98258,0,0017,1485417599,1453881599,Active Certified,7I,PMB 215,303 91st Ave NE Ste E502,Lake Stevens,WA,98258,603425952,19966681,19966681
+37,55,Medicine Creek Analytics,"3700 Pacific Hwy E., Suite 400",,Fife,WA,98424,0,0018,1498892399,1464245999,Active Certified,7A,,,,,,603547955,34062729,34062729
+38,60,MOLECULAR TESTING LABS,14401 SE 1ST ST,,VANCOUVER,WA,98684-3503,0,0019,1506841199,1475218799,ACTIVE CERTIFIED,7U,14401 SE 1ST ST,,VANCOUVER,WA,98684-3503,603032382,51690231,51690231
+71,93,CAPITOL ANALYSIS,422 Carpenter Rd,Suite 106,Olympia,WA,98503,0,0022,1512115199,1479369599,Active Certified,7C,,,,,,603617315,60039664,60039664
