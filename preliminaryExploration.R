@@ -1,10 +1,15 @@
 library(dplyr)
 library(ggplot2)
 library(knitr)
+install.packages("readr")
 
 retailVancouver <- read.csv("../data/retail analysis dataset final - cmu.csv", sep=",", header=T)
-dispensing <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
+dispensing.sample <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
 inventory <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
+dispensing <- read.csv("../data/Dec2016/biotrackthc_dispensing.csv", sep=",", header=T)
+# this next file was too big to load earlier, but can try again
+#derivatives <- read.csv("../data/Dec2016/biotrackthc_plantderivatives.csv", sep=",", header=T)
+
 
 names(inventory)
 unique(inventory$location)
