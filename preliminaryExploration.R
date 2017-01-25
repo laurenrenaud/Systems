@@ -1,20 +1,53 @@
 library(dplyr)
 library(ggplot2)
 library(knitr)
-install.packages("readr")
+library(readr)
+library(lubridate)
 
+# from the sample data from Blackboard
 retailVancouver <- read.csv("../data/retail analysis dataset final - cmu.csv", sep=",", header=T)
-dispensing.sample <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
-inventory <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
-dispensing <- read.csv("../data/Dec2016/biotrackthc_dispensing.csv", sep=",", header=T)
-# this next file was too big to load earlier, but can try again
-#derivatives <- read.csv("../data/Dec2016/biotrackthc_plantderivatives.csv", sep=",", header=T)
+dispensing.cmu <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
+inventory <- read.csv("../data/inventory - cmu - raw.csv", sep=",", header=T)
+# reference for what inventory types mean
+inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
 
 
-names(inventory)
-unique(inventory$location)
-summary(inventory$usableweight)
-nrow(inventory)
+# -------------- location Data
+
+# first file is all locations - producers, processors, retailers, 
+locations <- read.csv("../data/Labs & Liscensees/biotrackthc_locations.csv", sep=",", header=T)
+# file that has codes for different location types
+locationtypes <- read.csv("../data/Labs & Liscensees/locationtypes.csv", sep=",", header=T)
+
+# create dataframe of only retailers (has been written out to 'labs & liscensee' folders as csvs)
+retailers <- dplyr::filter(locations, retail==1)
+# create dataframe of only producers
+producers <- dplyr::filter(locations, producer==1)
+# create dataframe of only processors
+processors <- dplyr::filter(locations, processor==1)
+
+###
+### need to figure out 
+### locationid
+### locationtype
+### locationexp
+### locationissue
+### in biotrackthc_locations.csv
+
+
+
+# -------------- Sales Data
+dispensing <- read.csv("../data/Dec2016/biotrackthc_dispensing2.csv", sep=",", header=T)
+dispensing$sessiontime <- as.POSIXct(dispensing$sessiontime, origin = "1970-01-01")
+dispensing$sale_month <- month(dispensing$sessiontime)
+dispensing$sale_day <- day(dispensing$sessiontime)
+dispensing$sale_hour <- hour(dispensing$sessiontime)
+
+
+# -------------- exploring plantderivatives
+derivatives <- read.csv("../data/Dec2016/biotrackthc_plantderivatives2.csv", sep=",", header=T)
+derivatives <- left_join(derivatives, inventory.types, by="inventorytype")
+
 
 
 # -------------- exploring retailVancouver
@@ -43,18 +76,15 @@ median(dispensing$price, na.rm=T)
 # percentage refunded
 sum(dispensing$refunded, na.rm=T) / nrow(dispensing)
 
-unique(dispensing$location)
 
-# -------------- exploring inventorytypes
-unique(dispensing$inventorytype)
-dispensing$inventorytype[which(dispensing$inventorytype==22)] <- "Solid Marijuana Infused Edible"
-dispensing$inventorytype[which(dispensing$inventorytype==23)] <- "Liquid Marijuana Infused Edible"
-dispensing$inventorytype[which(dispensing$inventorytype==24)] <- "Marijuana Extract for Inhalation"
-dispensing$inventorytype[which(dispensing$inventorytype==25)] <- "Marijuana Infused Topicals"
-dispensing$inventorytype[which(dispensing$inventorytype==28)] <- "Usable Marijuana"
-dispensing$inventorytype[which(dispensing$inventorytype==31)] <- "Marijuana Mix Package"
-dispensing$inventorytype[which(dispensing$inventorytype==32)] <- "Marijuana Mix Infused"
-dispensing$inventorytype[which(dispensing$inventorytype==37)] <- "Suppository"
+# -------------- exploring dispensing (aka retail) data from sample
+dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
+# sampling for smaller files
+dispensing.list <- sample(dispensing$id, 15000, replace=F)
+dispensing.sample <- dplyr::filter(dispensing, id %in% dispensing.list)
+#write.table(dispensing.sample, file="../data/Dec2016/samples/dispensing_sample.csv", sep=",", row.names = F, col.names = T)
+
+class(dispensing$inv_type_name)
 
 dispensing <- within(dispensing,
                      inventorytype <- factor(inventorytype,levels=names(sort(table(inventorytype), decreasing=T))))
