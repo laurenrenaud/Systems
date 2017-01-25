@@ -84,24 +84,23 @@ dispensing.list <- sample(dispensing$id, 15000, replace=F)
 dispensing.sample <- dplyr::filter(dispensing, id %in% dispensing.list)
 #write.table(dispensing.sample, file="../data/Dec2016/samples/dispensing_sample.csv", sep=",", row.names = F, col.names = T)
 
-class(dispensing$inv_type_name)
 
-dispensing <- within(dispensing,
-                     inventorytype <- factor(inventorytype,levels=names(sort(table(inventorytype), decreasing=T))))
+dispensing.sample <- within(dispensing.sample,
+                            inv_type_name <- factor(inv_type_name,levels=names(sort(table(inv_type_name), decreasing=T))))
 
-dispensing %>%
-  dplyr::group_by(inventorytype) %>%
+dispensing.sample %>%
+  dplyr::group_by(inv_type_name) %>%
   dplyr::summarise(
     Count = n(),
     meanPrice = round(mean(price), 2)
   ) %>%
-  ggplot(aes(x=inventorytype, y=Count)) + 
+  ggplot(aes(x=inv_type_name, y=Count)) + 
   geom_bar(stat="identity") + 
   labs(title = "Inventory by Type") + 
   coord_flip() 
 
-dispensing %>%
-  dplyr::group_by(inventorytype) %>%
+dispensing.sample %>%
+  dplyr::group_by(inv_type_name) %>%
   summarise(Count = n(),
             meanPrice = round(mean(price), 2)) %>%
   kable(col.names=c("Type", "Count", "Avg Price"))
