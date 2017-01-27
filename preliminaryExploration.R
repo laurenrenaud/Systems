@@ -1,6 +1,7 @@
 library(dplyr)
 library(ggplot2)
 library(knitr)
+library(tidyr)
 library(readr)
 library(lubridate)
 
@@ -10,6 +11,8 @@ dispensing.cmu <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header
 inventory <- read.csv("../data/inventory - cmu - raw.csv", sep=",", header=T)
 # reference for what inventory types mean
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
+# massive file:
+#inventorylog <- readr::read_csv("../data/Dec2016/biotrackthc_inventorylog.csv")
 
 
 # -------------- location Data
@@ -35,13 +38,47 @@ processors <- dplyr::filter(locations, processor==1)
 ### in biotrackthc_locations.csv
 
 
-
 # -------------- Sales Data
 dispensing <- read.csv("../data/Dec2016/biotrackthc_dispensing2.csv", sep=",", header=T)
-dispensing$sessiontime <- as.POSIXct(dispensing$sessiontime, origin = "1970-01-01")
-dispensing$sale_month <- month(dispensing$sessiontime)
-dispensing$sale_day <- day(dispensing$sessiontime)
-dispensing$sale_hour <- hour(dispensing$sessiontime)
+dispensing$monthtime <- as.POSIXct(dispensing$sessiontime, origin = "1970-01-01")
+dispensing$sale_year <- year(dispensing$monthtime)
+dispensing$sale_month <- month(dispensing$monthtime)
+dispensing$sale_day <- day(dispensing$monthtime)
+dispensing$sale_hour <- hour(dispensing$monthtime)
+dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
+write.table(dispensing, file="../data/Dec2016/cleaned/dispensing.csv", sep=",")
+
+# sampling for smaller files
+dispensing.list <- sample(dispensing$id, 35000, replace=F)
+dispensing.sample <- dplyr::filter(dispensing, id %in% dispensing.list)
+write.table(dispensing.sample, file="../data/Dec2016/cleaned/samples/dispensing_sample.csv", 
+            sep=",", row.names = F, col.names = T)
+
+# create table of all stores total sales, sorted by total sales
+top.stores <- dispensing %>%
+  group_by(location) %>%
+  summarise(total_sales = sum(price, na.rm=T)) %>%
+  arrange(desc(total_sales)) %>%
+  left_join(locations, by=c("location" = "id")) %>%
+  select(location, total_sales, name, address1, city, zip, locationtype,
+         status, loclatitude, loclongitude) %>%
+  left_join(locationtypes, by=c("locationtype" = "code"))
+write.table(top.stores, file="../data/Dec2016/cleaned/samples/stores_by_totalsales.csv", sep=",")
+
+
+# create table of all stores total sales by month, sorted by total sales
+top.stores.by.month <- dispensing %>%
+  group_by(location, sale_year, sale_month) %>%
+  summarise(total_sales = sum(price, na.rm=T)) %>%
+  arrange(desc(total_sales)) %>%
+  left_join(locations, by=c("location" = "id")) %>%
+  select(location, sale_year, sale_month, total_sales, name, address1, city, zip, locationtype,
+         status, loclatitude, loclongitude) %>%
+  left_join(locationtypes, by=c("locationtype" = "code"))
+#write.table(top.stores.by.month, file="../data/Dec2016/cleaned/samples/stores_by_totalsales_month.csv", sep=",")
+
+## find the top 20% of sales
+
 
 
 # -------------- exploring plantderivatives
@@ -78,12 +115,6 @@ sum(dispensing$refunded, na.rm=T) / nrow(dispensing)
 
 
 # -------------- exploring dispensing (aka retail) data from sample
-dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
-# sampling for smaller files
-dispensing.list <- sample(dispensing$id, 15000, replace=F)
-dispensing.sample <- dplyr::filter(dispensing, id %in% dispensing.list)
-#write.table(dispensing.sample, file="../data/Dec2016/samples/dispensing_sample.csv", sep=",", row.names = F, col.names = T)
-
 
 dispensing.sample <- within(dispensing.sample,
                             inv_type_name <- factor(inv_type_name,levels=names(sort(table(inv_type_name), decreasing=T))))
