@@ -39,6 +39,7 @@ processors <- dplyr::filter(locations, processor==1)
 
 
 # -------------- Sales Data
+<<<<<<< HEAD
 dispensing <- read.csv("../data/Dec2016/cleaned/dispensing.csv", sep=",", header=T)
 dispensing$monthtime <- as.POSIXct(dispensing$sessiontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
@@ -48,6 +49,16 @@ dispensing$monthtime <- as.POSIXct(dispensing$sessiontime,
 dispensing$sale_hour <- hour(dispensing$monthtime)
 # dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
 # write.table(dispensing, file="../data/Dec2016/cleaned/dispensing.csv", sep=",")
+=======
+dispensing <- read.csv("../data/Dec2016/biotrackthc_dispensing2.csv", sep=",", header=T)
+dispensing$monthtime <- as.POSIXct(dispensing$sessiontime, origin = "1970-01-01")
+dispensing$sale_year <- year(dispensing$monthtime)
+dispensing$sale_month <- month(dispensing$monthtime)
+dispensing$sale_day <- day(dispensing$monthtime)
+dispensing$sale_hour <- hour(dispensing$monthtime)
+dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
+write.table(dispensing, file="../data/Dec2016/cleaned/dispensing.csv", sep=",")
+>>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
 
 # sampling for smaller files
 dispensing.list <- sample(dispensing$id, 35000, replace=F)
@@ -56,7 +67,11 @@ write.table(dispensing.sample, file="../data/Dec2016/cleaned/samples/dispensing_
             sep=",", row.names = F, col.names = T)
 
 # create table of all stores total sales, sorted by total sales
+<<<<<<< HEAD
 stores.by.sales <- dispensing %>%
+=======
+top.stores <- dispensing %>%
+>>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
   group_by(location) %>%
   summarise(total_sales = sum(price, na.rm=T)) %>%
   arrange(desc(total_sales)) %>%
@@ -68,7 +83,11 @@ write.table(top.stores, file="../data/Dec2016/cleaned/samples/stores_by_totalsal
 
 
 # create table of all stores total sales by month, sorted by total sales
+<<<<<<< HEAD
 stores.sales.by.month <- dispensing %>%
+=======
+top.stores.by.month <- dispensing %>%
+>>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
   group_by(location, sale_year, sale_month) %>%
   summarise(total_sales = sum(price, na.rm=T)) %>%
   arrange(desc(total_sales)) %>%
@@ -78,6 +97,7 @@ stores.sales.by.month <- dispensing %>%
   left_join(locationtypes, by=c("locationtype" = "code"))
 #write.table(top.stores.by.month, file="../data/Dec2016/cleaned/samples/stores_by_totalsales_month.csv", sep=",")
 
+<<<<<<< HEAD
 # dispensing -  week selections
 summary(dispensing$monthtime)
 # Min.               1st Qu.                Median                  Mean               3rd Qu. 
@@ -122,6 +142,10 @@ top.10.stores <- dispensing %>%
   filter(location %in% top.10.list)
 # write.table(top.10.stores,
 #             file="../data/Dec2016/cleaned/samples/top_10_stores.csv", sep=",")
+=======
+## find the top 20% of sales
+
+>>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
 
 
 # -------------- exploring plantderivatives
