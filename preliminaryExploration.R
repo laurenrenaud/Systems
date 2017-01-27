@@ -18,16 +18,29 @@ inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",
 # -------------- location Data
 
 # first file is all locations - producers, processors, retailers, 
-locations <- read.csv("../data/Labs & Liscensees/biotrackthc_locations.csv", sep=",", header=T)
-# file that has codes for different location types
-locationtypes <- read.csv("../data/Labs & Liscensees/locationtypes.csv", sep=",", header=T)
+#locations <- read.csv("../data/Labs & Liscensees/biotrackthc_locations.csv", sep=",", header=T)
+# don't know what 'locationid' means. All values are 1 or 2. Is not same as unique identifies (3-4 digits),
+# or location types (which are indicated by locationtype). 
+# changing to locationid_unknownvariable to avoid further confusion by other users
+locations <- rename(locations, locationid_unknownvariable = locationid)
+locations <- rename(locations, location_id = id)
+write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv",
+            sep=",", row.names = F, col.names = T)
+locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
 
-# create dataframe of only retailers (has been written out to 'labs & liscensee' folders as csvs)
+# file that has codes for different location types
+locationtypes <- read.csv("../data/Dec2016/cleaned/locations/locationtypes.csv", sep=",", header=T)
+
+
+# create dataframe of only retailers
 retailers <- dplyr::filter(locations, retail==1)
+write.table(retailers, file="../data/Dec2016/cleaned/locations/retailers.csv")
 # create dataframe of only producers
 producers <- dplyr::filter(locations, producer==1)
+write.table(producers, file="../data/Dec2016/cleaned/locations/producers.csv")
 # create dataframe of only processors
 processors <- dplyr::filter(locations, processor==1)
+write.table(processors, file="../data/Dec2016/cleaned/locations/processors.csv")
 
 ###
 ### need to figure out 
@@ -39,26 +52,19 @@ processors <- dplyr::filter(locations, processor==1)
 
 
 # -------------- Sales Data
-<<<<<<< HEAD
 dispensing <- read.csv("../data/Dec2016/cleaned/dispensing.csv", sep=",", header=T)
 dispensing$monthtime <- as.POSIXct(dispensing$sessiontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-# dispensing$sale_year <- year(dispensing$monthtime)
-# dispensing$sale_month <- month(dispensing$monthtime)
-# dispensing$sale_day <- day(dispensing$monthtime)
-dispensing$sale_hour <- hour(dispensing$monthtime)
-# dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
-# write.table(dispensing, file="../data/Dec2016/cleaned/dispensing.csv", sep=",")
-=======
-dispensing <- read.csv("../data/Dec2016/biotrackthc_dispensing2.csv", sep=",", header=T)
-dispensing$monthtime <- as.POSIXct(dispensing$sessiontime, origin = "1970-01-01")
+# already run to get above dataset
 dispensing$sale_year <- year(dispensing$monthtime)
 dispensing$sale_month <- month(dispensing$monthtime)
 dispensing$sale_day <- day(dispensing$monthtime)
 dispensing$sale_hour <- hour(dispensing$monthtime)
+dispensing$dayofweek <- weekdays(dispensing$monthtime)
+dispensing$dayofweek = with(dispensing, factor(dayofweek,c("Monday", "Tuesday", "Wednesday",
+                                                           "Thursday", "Friday", "Saturday", "Sunday")))
 dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
 write.table(dispensing, file="../data/Dec2016/cleaned/dispensing.csv", sep=",")
->>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
 
 # sampling for smaller files
 dispensing.list <- sample(dispensing$id, 35000, replace=F)
@@ -67,11 +73,7 @@ write.table(dispensing.sample, file="../data/Dec2016/cleaned/samples/dispensing_
             sep=",", row.names = F, col.names = T)
 
 # create table of all stores total sales, sorted by total sales
-<<<<<<< HEAD
 stores.by.sales <- dispensing %>%
-=======
-top.stores <- dispensing %>%
->>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
   group_by(location) %>%
   summarise(total_sales = sum(price, na.rm=T)) %>%
   arrange(desc(total_sales)) %>%
@@ -79,15 +81,11 @@ top.stores <- dispensing %>%
   select(location, total_sales, name, address1, city, zip, locationtype,
          status, loclatitude, loclongitude) %>%
   left_join(locationtypes, by=c("locationtype" = "code"))
-write.table(top.stores, file="../data/Dec2016/cleaned/samples/stores_by_totalsales.csv", sep=",")
+write.table(stores.by.sales, file="../data/Dec2016/cleaned/samples/stores_by_totalsales.csv", sep=",")
 
 
 # create table of all stores total sales by month, sorted by total sales
-<<<<<<< HEAD
 stores.sales.by.month <- dispensing %>%
-=======
-top.stores.by.month <- dispensing %>%
->>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
   group_by(location, sale_year, sale_month) %>%
   summarise(total_sales = sum(price, na.rm=T)) %>%
   arrange(desc(total_sales)) %>%
@@ -95,9 +93,8 @@ top.stores.by.month <- dispensing %>%
   select(location, sale_year, sale_month, total_sales, name, address1, city, zip, locationtype,
          status, loclatitude, loclongitude) %>%
   left_join(locationtypes, by=c("locationtype" = "code"))
-#write.table(top.stores.by.month, file="../data/Dec2016/cleaned/samples/stores_by_totalsales_month.csv", sep=",")
+write.table(stores.sales.by.month, file="../data/Dec2016/cleaned/samples/stores_by_totalsales_month.csv", sep=",")
 
-<<<<<<< HEAD
 # dispensing -  week selections
 summary(dispensing$monthtime)
 # Min.               1st Qu.                Median                  Mean               3rd Qu. 
@@ -140,17 +137,56 @@ top.10.list <- stores.by.sales %>%
 # filter dispensing df to only top 10 sellers
 top.10.stores <- dispensing %>%
   filter(location %in% top.10.list)
-# write.table(top.10.stores,
-#             file="../data/Dec2016/cleaned/samples/top_10_stores.csv", sep=",")
-=======
-## find the top 20% of sales
+write.table(top.10.stores,
+            file="../data/Dec2016/cleaned/samples/top_10_stores.csv", sep=",")
 
->>>>>>> 141695d19fcbf23100ee6f889af1fc81a2784419
+
+# -------------- cleaning inventory
+inventory.sample <- read.csv("../data/Dec2016/cleaned/samples/inventory_smallsample.csv", sep=",", header=T)
+inventoryLog.sample <- read.csv("../data/Dec2016/cleaned/samples/inventoryLogSample.csv", sep=",", header=T)
+
+# -------------- cleaning inventory time based variables
+inventory.sample$monthtime <- as.POSIXct(inventory.sample$sessiontime,
+                                   origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+inventory.sample$sale_year <- year(inventory.sample$monthtime)
+inventory.sample$sale_month <- month(inventory.sample$monthtime)
+inventory.sample$sale_day <- day(inventory.sample$monthtime)
+inventory.sample$dayofweek <- weekdays(inventory.sample$monthtime)
+inventory.sample$dayofweek = with(inventory.sample, factor(dayofweek,
+                                                            c("Monday", "Tuesday", "Wednesday",
+                                                              "Thursday", "Friday", "Saturday", "Sunday")))
+inventory.sample$sale_hour <- hour(inventory.sample$monthtime)
+inventory.sample <- left_join(inventory.sample, inventory.types, by="inventorytype")
+write.table(inventory.sample, file="../data/Dec2016/cleaned/samples/inventory_smallsample.csv", sep=",")
+
+inventoryLog.sample$monthtime <- as.POSIXct(inventoryLog.sample$sessiontime,
+                                         origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+inventoryLog.sample$sale_year <- year(inventoryLog.sample$monthtime)
+inventoryLog.sample$sale_month <- month(inventoryLog.sample$monthtime)
+inventoryLog.sample$sale_day <- day(inventoryLog.sample$monthtime)
+inventoryLog.sample$dayofweek <- weekdays(inventoryLog.sample$monthtime)
+inventoryLog.sample$dayofweek = with(inventoryLog.sample, factor(dayofweek,
+                                                           c("Monday", "Tuesday", "Wednesday",
+                                                             "Thursday", "Friday", "Saturday", "Sunday")))
+inventoryLog.sample$sale_hour <- hour(inventoryLog.sample$monthtime)
+inventoryLog.sample <- left_join(inventoryLog.sample, inventory.types, by="inventorytype")
+write.table(inventoryLog.sample, file="../data/Dec2016/cleaned/samples/inventoryLogSample.csv", sep=",")
+
+# -------------- cleaning inventory location based variables
+inventory.sample <-  inventory.sample %>%
+  left_join(locations, by=c("location" = "location_id")) %>%
+  select(location, name, address1, city, zip, locationtype,
+         status, loclatitude, loclongitude) %>%
+  left_join(locationtypes, by=c("locationtype" = "locationtypeCodes"))
+write.table(inventoryLog.sample, file="../data/Dec2016/cleaned/samples/inventoryLogSample.csv", sep=",")
+
+
 
 
 # -------------- exploring plantderivatives
 derivatives <- read.csv("../data/Dec2016/biotrackthc_plantderivatives2.csv", sep=",", header=T)
 derivatives <- left_join(derivatives, inventory.types, by="inventorytype")
+
 
 
 # -------------- exploring retailVancouver
