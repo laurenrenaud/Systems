@@ -24,12 +24,40 @@ inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",
 # changing to locationid_unknownvariable to avoid further confusion by other users
 locations <- rename(locations, locationid_unknownvariable = locationid)
 locations <- rename(locations, location_id = id)
-locationtypes <- read.csv("../data/Dec2016/cleaned/locations/locationtypes.csv", sep=",", header=T)
-locations <- left_join(locations, locationtypes, by=c("locationtype" = "locationtypeCodes"))
 write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv",
             sep=",", row.names = F, col.names = T)
+
 locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
+
 locations.name.type <- select(locations, orgid, name, locationtypeNames, licensenum, location_id)
+
+locationtypes <- read.csv("../data/Dec2016/cleaned/locations/locationtypes.csv", sep=",", header=T)
+locations <- left_join(locations, locationtypes, by=c("locationtype" = "locationtypeCodes"))
+
+# first opened + length of time
+reportdate <- max(dispensing.sample$monthtime)
+locations <- dispensing %>%
+  group_by(location) %>%
+  summarise(
+    first_opened = min(monthtime),
+    months_open = ceiling(as.numeric(reportdate - first_opened)/30),
+    last_date = max(monthtime)
+    ) %>%
+  left_join(locations, by = c("location" = "location_id")) %>%
+  mutate(
+    months_open = ifelse(status == "ACTIVE (ISSUED)",
+                                         ceiling(as.numeric(reportdate - first_opened)/30),
+                                         ifelse(
+                                           status=="CLOSED (PERMANENT)",
+                                           ceiling(as.numeric(last_date - first_opened)/30),
+                                           NA
+                                         )))
+
+list.storesNotinDispensing <- unique(locations$location_id[!locations$location_id %in% list.storesindispensing & 
+                                                             locations$retail==1])
+
+storesNotInDispensing <- filter(locations, location_id %in% list.storesNotinDispensing)
+
 
 # file that has codes for different location types
 locationtypes <- read.csv("../data/Dec2016/cleaned/locations/locationtypes.csv", sep=",", header=T)
@@ -71,6 +99,7 @@ dispensing$sale_hour <- hour(dispensing$monthtime)
 dispensing$dayofweek <- weekdays(dispensing$monthtime)
 dispensing$dayofweek = with(dispensing, factor(dayofweek,c("Monday", "Tuesday", "Wednesday",
                                                            "Thursday", "Friday", "Saturday", "Sunday")))
+dispensing$date <- as.Date(dispensing$monthtime)
 dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
 #write.table(dispensing, file="../data/Dec2016/cleaned/dispensing.csv", sep=",")
 
@@ -168,6 +197,22 @@ write.table(top.5.stores,
             file="../data/Dec2016/cleaned/samples/top_5_stores.csv", sep=",",
             row.names = F, col.names = T)
 
+# number of transcations, over time, divided by stores
+dispensing %>%
+  group_by(date) %>%
+  summarise(avg_transactions = n() / length(unique(location))) %>%
+  ggplot(aes(x=date, y=avg_transactions)) +
+  geom_point(color="darkgreen") + 
+  geom_smooth(color="lightgreen", method = "loess")
+
+# sum of sales, over time, divided by stores
+dispensing %>%
+  group_by(date) %>%
+  summarise(avg_sales = sum(price) / length(unique(location))) %>%
+  ggplot(aes(x=date, y=avg_sales)) +
+  geom_point(color="darkgreen") + 
+  geom_smooth(color="lightgreen", method = "loess")
+
 
 # -------------- cleaning inventory
 inventory.sample <- read.csv("../data/Dec2016/cleaned/samples/inventorysample2.csv", sep=",", header=T)
@@ -184,6 +229,7 @@ inventory.sample$dayofweek = with(inventory.sample, factor(dayofweek,
                                                             c("Monday", "Tuesday", "Wednesday",
                                                               "Thursday", "Friday", "Saturday", "Sunday")))
 inventory.sample$sale_hour <- hour(inventory.sample$monthtime)
+inventory.sample$date <- as.Date(inventory.sample$monthtime)
 inventory.sample <- left_join(inventory.sample, inventory.types, by="inventorytype")
 write.table(inventory.sample, file="../data/Dec2016/cleaned/samples/inventorysample2.csv", sep=",",
             row.names=F)
@@ -200,6 +246,22 @@ inventoryLog.sample$dayofweek = with(inventoryLog.sample, factor(dayofweek,
 inventoryLog.sample$sale_hour <- hour(inventoryLog.sample$monthtime)
 inventoryLog.sample <- left_join(inventoryLog.sample, inventory.types, by="inventorytype")
 write.table(inventoryLog.sample, file="../data/Dec2016/cleaned/samples/inventoryLogSample.csv", sep=",", row.names=F)
+
+
+# joining inventory samples + dispensing
+inven.dispense <- inventory.sample %>%
+  select(inventoryid = id, strain, weight, inv.location = location, inv.parentid = parentid, inv.inventorytype = inv_type_name,
+         inv.useableweight = usableweight, inv.removescheduled = removescheduled,
+         inv.removescheduletime = removescheduletime,  inv.inventoryparentid = inventoryparentid,
+         inv.productname = productname,
+         inv.removereason = removereason, inv.inventorystatustime = inventorystatustime, inv.sourceid = source_id,
+         inv.date = date) %>%
+  left_join(dispensing, by="inventoryid") 
+
+test <- inven.dispense %>%
+  select(id, inv.date, date)
+
+
 
 # -------------- cleaning inventory location based variables
 inventory.sample <-  inventory.sample %>%
@@ -222,6 +284,41 @@ write.table(transfers.sample, file="../data/Dec2016/cleaned/samples/transfers_sa
 
 transfers.sample <- left_join(transfers.sample, locations.name.type, by=c("location" = "location_id"))
 transfers.sample <- left_join(transfers.sample, locationtypes, by=c("locationtype" = "locationtypeCodes"))
+
+transfers.sample <- read.csv("../data/Dec2016/cleaned/samples/transfers_sample.csv", header=T, sep=",")
+
+
+locations <- locations %>%
+  mutate(type_simp = ifelse(locationtypeNames == "Producer Tier 1" | locationtypeNames == "Producer Tier 2" |
+                              locationtypeNames == "Producer Tier 3",
+                            "Producer",
+                            ifelse(locationtypeNames == "Producer + Processor Tier 1" | locationtypeNames == "Producer + Processor Tier 2" |
+                                     locationtypeNames == "Producer + Processor Tier 3",
+                                   "Producer-Processor",
+                                   ifelse(locationtypeNames=="Processor",
+                                          "Processor",
+                                          "Retailer"))))
+
+locations_type_in <- select(locations, inbound_license = licensenum, inboundtype = type_simp, inboundcity = city)
+locations_type_out <- select(locations, outbound_license = licensenum, outboundtype = type_simp, outboundcity = city)
+
+test <- transfers.sample %>%
+  left_join(locations_type_in, by = c("inbound_license" = "inbound_license")) %>%
+  left_join(locations_type_out, by= c("outbound_license" = "outbound_license"))
+
+write.table(test, file="transfer_withtypes.csv", row.names = F, col.names = T, sep=",")
+
+sort(table(test$inboundtype))
+sort(table(test$outboundtype))
+
+review <- transfers.sample %>%
+  group_by(name) %>%
+  summarise(count = n_distinct(locationtypeNames)) %>%
+  arrange(desc(count)) %>%
+  group_by(count) %>%
+  summarise(pivot = n())
+
+summary(transfers.sample$unitprice[transfers.sample$locationtypeNames=="Retailer"])
 
 ## inventory conversions
 inventory_conversions <- read.csv("../data/Dec2016/biotrackthc_inventoryconversions.csv", sep=",", header=T)
