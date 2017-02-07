@@ -5,7 +5,7 @@ library(tidyr)
 library(readr)
 library(lubridate)
 
-# from the sample data from Blackboard
+# from the sample data from Blackboard -----
 retailVancouver <- read.csv("../data/retail analysis dataset final - cmu.csv", sep=",", header=T)
 dispensing.cmu <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
 inventory <- read.csv("../data/inventory - cmu - raw.csv", sep=",", header=T)
@@ -15,7 +15,7 @@ inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",
 #inventorylog <- readr::read_csv("../data/Dec2016/biotrackthc_inventorylog.csv")
 
 
-# -------------- location Data
+# location Data --------------
 
 # first file is all locations - producers, processors, retailers, 
 #locations <- read.csv("../data/Labs & Liscensees/biotrackthc_locations.csv", sep=",", header=T)
@@ -34,24 +34,6 @@ locations.name.type <- select(locations, orgid, name, locationtypeNames, license
 locationtypes <- read.csv("../data/Dec2016/cleaned/locations/locationtypes.csv", sep=",", header=T)
 locations <- left_join(locations, locationtypes, by=c("locationtype" = "locationtypeCodes"))
 
-# first opened + length of time
-reportdate <- max(dispensing.sample$monthtime)
-locations <- dispensing %>%
-  group_by(location) %>%
-  summarise(
-    first_opened = min(monthtime),
-    months_open = ceiling(as.numeric(reportdate - first_opened)/30),
-    last_date = max(monthtime)
-    ) %>%
-  left_join(locations, by = c("location" = "location_id")) %>%
-  mutate(
-    months_open = ifelse(status == "ACTIVE (ISSUED)",
-                                         ceiling(as.numeric(reportdate - first_opened)/30),
-                                         ifelse(
-                                           status=="CLOSED (PERMANENT)",
-                                           ceiling(as.numeric(last_date - first_opened)/30),
-                                           NA
-                                         )))
 
 list.storesNotinDispensing <- unique(locations$location_id[!locations$location_id %in% list.storesindispensing & 
                                                              locations$retail==1])
@@ -87,9 +69,9 @@ write.table(processors, file="../data/Dec2016/cleaned/locations/processors.csv",
 ### in biotrackthc_locations.csv
 
 
-# -------------- Sales Data
+# Sales Data --------------
 dispensing <- read.csv("../data/Dec2016/cleaned/dispensing.csv", sep=",", header=T)
-dispensing$monthtime <- as.POSIXct(dispensing$sessiontime,
+dispensing$monthtime <- as.POSIXct(dispensing$sessihontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
 # already run to get above dataset
 dispensing$sale_year <- year(dispensing$monthtime)
@@ -108,6 +90,8 @@ dispensing.list <- sample(dispensing$id, 35000, replace=F)
 dispensing.sample <- dplyr::filter(dispensing, id %in% dispensing.list)
 write.table(dispensing.sample, file="../data/Dec2016/cleaned/samples/dispensing_sample.csv", 
             sep=",", row.names = F, col.names = T)
+dispensing.sample <- read.csv("../data/Dec2016/cleaned/samples/dispensing_sample.csv")
+dispensing.sample$monthtime <- as.Date(dispensing.sample$monthtime)
 
 # create table of all stores total sales, sorted by total sales
 stores.by.sales <- dispensing %>%
@@ -214,7 +198,7 @@ dispensing %>%
   geom_smooth(color="lightgreen", method = "loess")
 
 
-# -------------- cleaning inventory
+# cleaning inventory --------------
 inventory.sample <- read.csv("../data/Dec2016/cleaned/samples/inventorysample2.csv", sep=",", header=T)
 inventoryLog.sample <- read.csv("../data/Dec2016/cleaned/samples/inventoryLogSample.csv", sep=",", header=T)
 
@@ -261,9 +245,54 @@ inven.dispense <- inventory.sample %>%
 test <- inven.dispense %>%
   select(id, inv.date, date)
 
+# using inventory to get open dates for locations ---------------
+# csvs from the following SQL queries:
+# 
+# select location, min(sessiontime)
+# from biotrackthc_inventory
+# group by location;
+# 
+# select location, min(sessiontime)
+# from biotrackthc_inventory
+# group by location;
+# 
+mindate <- read.csv("../data/Dec2016/cleaned/inventorymindate.csv", header=T, sep=",")
+maxdate <- read.csv("../data/Dec2016/cleaned/maxsessiontime.csv", header=T, sep=",")
+mindate$min.sessiontime. <- as.POSIXct(mindate$min.sessiontime.,
+                                       origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+maxdate$max.sessiontime. <- as.POSIXct(maxdate$max.sessiontime.,
+                                       origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+locationDates <- left_join(mindate, maxdate, by="location")
+
+locationDates <- rename(locationDates, minDate = min.sessiontime., maxDate = max.sessiontime.)
+locationDates <- read.csv("../data/Dec2016/cleaned/locations/locationDates.csv")
+locationDates$minDate <- as.Date(locationDates$minDate)
+locationDates$maxDate <- as.Date(locationDates$maxDate)
+#write.table(locationDates, file="../data/Dec2016/cleaned/locations/locationDates.csv", sep=",", row.names=F)
 
 
-# -------------- cleaning inventory location based variables
+# first opened + length of time
+reportdate <- max(dispensing.sample$monthtime)
+locations <- locations %>%
+  dplyr::left_join(locationDates, by=c("location_id" = "location")) %>%
+  dplyr::mutate(
+    months_open = ifelse(status == "ACTIVE (ISSUED)",
+                         ceiling(as.numeric(reportdate - minDate)/30),
+                         ifelse(
+                           status=="CLOSED (PERMANENT)",
+                           ceiling(as.numeric(maxDate - minDate)/30),
+                           NA
+                         )))
+#write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv", row.names = F,
+#            col.names = T, sep=",")
+
+# 296 locations do not appear in the inventory file / do not have dates in the inventory file:
+review <- locations %>%
+  filter(is.na(months_open)) %>%
+  select(location_id, status, locationtypeNames) %>%
+  arrange(status, locationtypeNames)
+
+# cleaning inventory location based variables --------------
 inventory.sample <-  inventory.sample %>%
   left_join(locations, by=c("location" = "location_id")) %>%
   select(location, name, address1, city, zip, locationtype,
@@ -273,7 +302,7 @@ write.table(inventory.sample, file="../data/Dec2016/cleaned/samples/inventorysam
             row.names=F)
 
 
-# -------------- cleaning inventory transfers
+# cleaning inventory transfers --------------
 inventorytransfers <- read.csv("../data/Dec2016/biotrackthc_inventorytransfers.csv", sep=",", header=T)
 inventorytransfers <- left_join(inventorytransfers, locations.name.type, by=c("location" = "location_id"))
 # sampling for smaller files
@@ -384,13 +413,13 @@ class(inventorytransfers$parentid)
 nrow(dispensing)
 
 
-# -------------- exploring plantderivatives
+# exploring plantderivatives --------------
 derivatives <- read.csv("../data/Dec2016/biotrackthc_plantderivatives2.csv", sep=",", header=T)
 derivatives <- left_join(derivatives, inventory.types, by="inventorytype")
 
 
 
-# -------------- exploring retailVancouver
+# exploring retailVancouver --------------
 names(retailVancouver)
 
 hist(retailVancouver$mday)
@@ -406,7 +435,7 @@ hist(retailVancouver$percUseable)
 
 names(dispensing)
 
-# -------------- exploring refunds
+# exploring refunds --------------
 dispensing$refunded <- as.logical(dispensing$refunded)
 # median amounts refunded are less than $1 more than median total amount
 summary(dispensing$price[dispensing$refunded])
@@ -417,7 +446,7 @@ median(dispensing$price, na.rm=T)
 sum(dispensing$refunded, na.rm=T) / nrow(dispensing)
 
 
-# -------------- exploring dispensing (aka retail) data from sample
+# exploring dispensing (aka retail) data from sample --------------
 
 dispensing.sample <- within(dispensing.sample,
                             inv_type_name <- factor(inv_type_name,levels=names(sort(table(inv_type_name), decreasing=T))))
@@ -440,7 +469,7 @@ dispensing.sample %>%
   kable(col.names=c("Type", "Count", "Avg Price"))
 
 
-# -------------- exploring inventorytypes
+# exploring inventorytypes -------------- 
 summary(dispensing$weight)
 summary(dispensing$usableweight)
 # need to ask questions about weight and useable weight because
@@ -453,7 +482,7 @@ hist(dispensing$percUseable)
 sum(is.na(dispensing$usableweight)) / nrow(dispensing)
 
 
-# -------------- exploring items in transaction
+# exploring items in transaction --------------
 by.transaction <- dispensing %>%
   dplyr::group_by(transactionid) %>%
   summarise(numItems = n(),
