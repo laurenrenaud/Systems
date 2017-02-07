@@ -9,7 +9,6 @@ library(lubridate)
 retailVancouver <- read.csv("../data/retail analysis dataset final - cmu.csv", sep=",", header=T)
 dispensing.cmu <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
 inventory <- read.csv("../data/inventory - cmu - raw.csv", sep=",", header=T)
-# reference for what inventory types mean
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
 # massive file:
 #inventorylog <- readr::read_csv("../data/Dec2016/biotrackthc_inventorylog.csv")
@@ -69,7 +68,7 @@ write.table(processors, file="../data/Dec2016/cleaned/locations/processors.csv",
 ### in biotrackthc_locations.csv
 
 
-# Sales Data --------------
+# dispensing Data --------------
 dispensing <- read.csv("../data/Dec2016/cleaned/dispensing.csv", sep=",", header=T)
 dispensing$monthtime <- as.POSIXct(dispensing$sessihontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
@@ -83,7 +82,7 @@ dispensing$dayofweek = with(dispensing, factor(dayofweek,c("Monday", "Tuesday", 
                                                            "Thursday", "Friday", "Saturday", "Sunday")))
 dispensing$date <- as.Date(dispensing$monthtime)
 dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
-#write.table(dispensing, file="../data/Dec2016/cleaned/dispensing.csv", sep=",")
+write.table(dispensing, file="../data/Dec2016/cleaned/dispensing2.csv", sep=",", row.names=F)
 
 # sampling for smaller files
 dispensing.list <- sample(dispensing$id, 35000, replace=F)
@@ -106,7 +105,7 @@ write.table(stores.by.sales, file="../data/Dec2016/cleaned/samples/stores_by_tot
             row.names = F, col.names = T)
 
 
-# create table of all stores total sales by month, sorted by total sales
+# create table of all stores total sales by month, sorted by total sales -----
 stores.sales.by.month <- dispensing %>%
   group_by(location, sale_year, sale_month) %>%
   summarise(total_sales = sum(price, na.rm=T)) %>%
@@ -118,7 +117,7 @@ stores.sales.by.month <- dispensing %>%
 write.table(stores.sales.by.month, file="../data/Dec2016/cleaned/samples/stores_by_totalsales_month.csv",
             sep=",", row.names = F, col.names = T)
 
-# dispensing -  week selections
+# dispensing -  week selections ------
 summary(dispensing$monthtime)
 # Min.               1st Qu.                Median                  Mean               3rd Qu. 
 # "2014-07-08 10:46:59" "2015-11-02 20:29:36" "2016-04-14 13:49:54" "2016-03-06 20:27:51" "2016-08-04 13:36:41" 
@@ -153,7 +152,7 @@ write.table(dispensing_apr_03_09_2016,
             file="../data/Dec2016/cleaned/samples/dispensing_apr_03_09_2016.csv", sep=",",
             row.names = F, col.names = T)
 
-# get all sales for top ten stores
+# get all sales for top ten stores -----
 
 # create list of the location number for the top 10 stores
 top.10.list <- stores.by.sales %>%
@@ -196,6 +195,40 @@ dispensing %>%
   ggplot(aes(x=date, y=avg_sales)) +
   geom_point(color="darkgreen") + 
   geom_smooth(color="lightgreen", method = "loess")
+
+sales.byloc.byday <- dispensing %>%
+  group_by(date, location) %>%
+  summarise(
+    total_sales = sum(price, na.rm=T),
+    total_transactions = n()
+  ) %>%
+  arrange(date, total_sales)
+write.table(sales.byloc.byday, file="../data/Dec2016/cleaned/samples/sales_bystore_byday.csv",
+            row.names=F, col.names=T, sep=",")
+
+numstores.byday <- dispensing %>%
+  group_by(date) %>%
+  summarise(
+    num_stores = length(unique(location))
+  ) %>%
+  arrange(date)
+write.table(numstores.byday, file="../data/Dec2016/cleaned/samples/countstores_byday.csv",
+            row.names=F, col.names=T, sep=",")
+
+
+# dispensing @ border stores --------
+# list from Yilan's border analysis
+borderstores <- c(810, 887, 457, 910, 1751, 1761, 1874, 230, 247, 
+                  249, 307, 399, 405, 502, 692, 1101, 1144, 1213, 
+                  1608, 1942)
+locations.forborderjoin <- select(locations, name, location_id, status, loclatitude, loclongitude, 
+                                  minDate, maxDate, months_open)
+border.sales <- dispensing %>%
+  filter(location %in% borderstores) %>%
+  left_join(locations.forborderjoin, by=c("location" = "location_id"))
+
+write.table(border.sales, file="../data/Dec2016/cleaned/samples/border_stores.csv", row.names=F, col.names=T, sep=",")
+  
 
 
 # cleaning inventory --------------
@@ -511,3 +544,41 @@ summary(by.transaction$sumPrice[by.transaction$numItems>10])
 
 names(retailVancouver)
 unique(retailVancouver$store_loc)
+
+# joints prices by loation --------
+forks <- read.csv("../data/Dec2016/cleaned/samples/joints_forks.csv", header=T, sep=",")
+seattle <- read.csv("../data/Dec2016/cleaned/samples/joints_seattle.csv", header=T, sep=",")
+roslyn <- read.csv("../data/Dec2016/cleaned/samples/joints_roslyn.csv", header=T, sep=",")
+spokane <- read.csv("../data/Dec2016/cleaned/samples/joints_spokane.csv", header=T, sep=",")
+
+forks <- forks %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  mutate(date = as.POSIXct(sessiontime, origin = "1970-01-01", tz="America/Los_Angeles"),
+         date = as.Date(date))
+write.table(forks, file="../data/Dec2016/cleaned/samples/joints_forks.csv", row.names = F, col.names = T, sep=",")
+
+seattle <- seattle %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  mutate(date = as.POSIXct(sessiontime, origin = "1970-01-01", tz="America/Los_Angeles"),
+         date = as.Date(date))
+write.table(seattle, file="../data/Dec2016/cleaned/samples/joints_seattle.csv", row.names = F, col.names = T, sep=",")
+
+
+roslyn <- roslyn %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  mutate(date = as.POSIXct(sessiontime, origin = "1970-01-01", tz="America/Los_Angeles"),
+         date = as.Date(date))
+write.table(roslyn, file="../data/Dec2016/cleaned/samples/joints_roslyn.csv", row.names = F, col.names = T, sep=",")
+
+
+spokane <- spokane %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  mutate(date = as.POSIXct(sessiontime, origin = "1970-01-01", tz="America/Los_Angeles"),
+         date = as.Date(date))
+write.table(spokane, file="../data/Dec2016/cleaned/samples/joints_spokane.csv", row.names = F, col.names = T, sep=",")
+
+
+
+# remove objects from environment
+# http://stackoverflow.com/questions/6190051/how-can-i-remove-all-objects-but-one-from-the-workspace-in-r
+# rm(list=setdiff(ls(), "x"))
