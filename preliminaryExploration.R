@@ -35,7 +35,8 @@ write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv
 
 locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
 
-locations.name.type <- select(locations, orgid, name, locationtypeNames, licensenum, location_id)
+locations.name.type <- select(locations, name, locationtypeNames, retail_license = licensenum, location_id)
+locations.name.city <- select(locations, name, licensenum, location_id, city)
 
 locationtypes <- read.csv("../data/Dec2016/cleaned/locations/locationtypes.csv", sep=",", header=T)
 locations <- left_join(locations, locationtypes, by=c("locationtype" = "locationtypeCodes"))
@@ -79,6 +80,7 @@ write.table(processors, file="../data/Dec2016/cleaned/locations/processors.csv",
 dispensing <- readr::read_csv("../data/Dec2016/cleaned/dispensing.csv")
 dispensing$monthtime <- as.POSIXct(dispensing$sessihontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+dispensing$monthtime <- as.Date(dispensing$monthtime)
 # already run to get above dataset
 dispensing$sale_year <- year(dispensing$monthtime)
 dispensing$sale_month <- month(dispensing$monthtime)
@@ -89,6 +91,7 @@ dispensing$dayofweek = with(dispensing, factor(dayofweek,c("Monday", "Tuesday", 
                                                            "Thursday", "Friday", "Saturday", "Sunday")))
 dispensing$date <- as.Date(dispensing$monthtime)
 dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
+dispensing$inv_type_name <- as.factor(dispensing$inv_type_name)
 write.table(dispensing, file="../data/Dec2016/cleaned/dispensing2.csv", sep=",", row.names=F)
 
 # sampling for smaller files
@@ -716,8 +719,12 @@ potency_tidy <- potency %>%
   # select only variables for retail set
   # only including test_inventorytype and product name to confirm against inventory
   # but should be duplicative
-  dplyr::select(sample_id, CBD, THC, THCA, Total, test_inventorytype = inventorytype, test_productname = product_name, inventoryparentid)
+  dplyr::select(sample_id, CBD, THC, THCA, Total, test_inventorytype = inventorytype,
+                test_productname = product_name, inventoryparentid)
 
+length(unique(labsamples$inventoryparentid))
+length(unique(labsamples$id))
+length(unique(labsamples$location))
 
 # recreating Steve's retail df ------
 retail <- dispensing %>%
@@ -726,6 +733,14 @@ retail <- dispensing %>%
   dplyr::select(dispensingid = id, location = location.x, price, usableweight = usableweight.x, inv_type_name,
                 strain, productname, CBD, THC, THCA, Total, weight = weight.x, saletime = monthtime, inventoryid,
                 transactionid = transactionid.x, deleted = deleted.x, refunded, inventorytype = inventorytype.x,
-                inventoryparentid)
+                inventoryparentid) %>%
+  left_join(locations.name.city, by=c("location" = "location_id"))
 
+retail$inv_type_name <- as.factor(retail$inv_type_name)
+retail$saletime <- as.Date(retail$saletime)
 
+lm(formula = price ~ usableweight + inv_type_name, data=retail)
+
+class(retail$saletime)
+
+write.table(retail, file="../data/Dec2016/cleaned/retail_detail.csv", sep=",", row.names = F, col.names = T)
