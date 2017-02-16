@@ -4,14 +4,21 @@ library(knitr)
 library(tidyr)
 library(readr)
 library(lubridate)
+library(stringr)
 
 # from the sample data from Blackboard -----
 retailVancouver <- read.csv("../data/retail analysis dataset final - cmu.csv", sep=",", header=T)
 dispensing.cmu <- read.csv("../data/dispensing - cmu - raw.csv", sep=",", header=T)
-inventory <- read.csv("../data/inventory - cmu - raw.csv", sep=",", header=T)
+inventory.initialsample <- read.csv("../data/inventory - cmu - raw.csv", sep=",", header=T)
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
 # massive file:
 #inventorylog <- readr::read_csv("../data/Dec2016/biotrackthc_inventorylog.csv")
+
+review <- retailVancouver %>%
+  filter(weight >= 10) %>%
+  select(weight, productname, price, invtype, subtype)
+
+names(retailVancouver)
 
 
 # location Data --------------
@@ -69,7 +76,7 @@ write.table(processors, file="../data/Dec2016/cleaned/locations/processors.csv",
 
 
 # dispensing Data --------------
-dispensing <- read.csv("../data/Dec2016/cleaned/dispensing.csv", sep=",", header=T)
+dispensing <- readr::read_csv("../data/Dec2016/cleaned/dispensing.csv")
 dispensing$monthtime <- as.POSIXct(dispensing$sessihontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
 # already run to get above dataset
@@ -103,6 +110,16 @@ stores.by.sales <- dispensing %>%
   left_join(locationtypes, by=c("locationtype" = "locationtypeCodes"))
 write.table(stores.by.sales, file="../data/Dec2016/cleaned/samples/stores_by_totalsales.csv", sep=",",
             row.names = F, col.names = T)
+
+hist(dispensing$price[dispensing$price > 0 & dispensing$price < 500])
+hist(dispensing$price[dispensing$price > 0 & dispensing$price < 100])
+dispensing %>%
+  filter(price > 0 & price < 100) %>%
+  ggplot(aes(x = price)) + 
+  geom_histogram(breaks=seq(0,100, by=5), fill="green4", color="honeydew") +
+  labs(title = "Distribution of Item Price",
+       x = "Unit Price",
+       y = "Number of Units Sold")
 
 
 # create table of all stores total sales by month, sorted by total sales -----
@@ -196,6 +213,14 @@ dispensing %>%
   geom_point(color="darkgreen") + 
   geom_smooth(color="lightgreen", method = "loess")
 
+# look at product names by top sales prices
+top.products <- dispensing %>%
+  arrange(desc(price)) %>%
+  select(id, price, inventoryid, location, inv_type_name) %>%
+  head(30) 
+
+list.topproductsinv <- top.products$inventoryid
+
 sales.byloc.byday <- dispensing %>%
   group_by(date, location) %>%
   summarise(
@@ -234,8 +259,14 @@ write.table(border.sales, file="../data/Dec2016/cleaned/samples/border_stores.cs
 # cleaning inventory --------------
 inventory.sample <- read.csv("../data/Dec2016/cleaned/samples/inventorysample2.csv", sep=",", header=T)
 inventoryLog.sample <- read.csv("../data/Dec2016/cleaned/samples/inventoryLogSample.csv", sep=",", header=T)
+inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory2.csv")
 
-# -------------- cleaning inventory time based variables
+# cleaning inventory time based variables-------------- 
+inventory$sessiontime <- as.POSIXct(inventory$sessiontime,
+                                           origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+inventory$date <- as.Date(inventory$sessiontime)
+
+# on sample, can apply to full df too
 inventory.sample$monthtime <- as.POSIXct(inventory.sample$sessiontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
 inventory.sample$sale_year <- year(inventory.sample$monthtime)
@@ -333,7 +364,7 @@ inventory.sample <-  inventory.sample %>%
   left_join(locationtypes, by=c("locationtype" = "locationtypeCodes"))
 write.table(inventory.sample, file="../data/Dec2016/cleaned/samples/inventorysample2.csv", sep=",",
             row.names=F)
-
+inventory.sample <- read.csv(file="../data/Dec2016/cleaned/samples/inventorysample2.csv")
 
 # cleaning inventory transfers --------------
 inventorytransfers <- read.csv("../data/Dec2016/biotrackthc_inventorytransfers.csv", sep=",", header=T)
@@ -349,6 +380,71 @@ transfers.sample <- left_join(transfers.sample, locationtypes, by=c("locationtyp
 
 transfers.sample <- read.csv("../data/Dec2016/cleaned/samples/transfers_sample.csv", header=T, sep=",")
 
+# attempting inv trans dispense joins ------------
+
+inv_inhalation <- read.csv(file="../data/Dec2016/cleaned/testing/inhalation.csv", sep=",", header=T)
+
+test.inhale <- select(inv_inhalation, inventory_id = id, strain, transactionid, location, 
+                      plantid, inventoryparentid, productname, inventorystatus, inventorystatustime,
+                      sample_id, source_id, inventorytype)
+
+inhale.one <- head(test.inhale, 1)
+
+# id =
+# 6033489510000160
+
+test.transfers <- select(transfers.sample, transfers_id = id, inventory_id = inventoryid, strain,
+                         transactionid, location, transfertype,
+                         parentid, outbound_license, inbound_license, description, saleprice, manifestid,
+                         manifest_stop, unitprice, inbound_location, locationtype, licensenum, locationtypeNames)
+
+test.inventory <- select(inventory.sample, inventory_id = id, strain, transactionid, location, 
+                         plantid, inventoryparentid, productname, inventorystatus, inventorystatustime,
+                         sample_id, source_id, monthtime, inv_type_name)
+
+test.dispensing <- select(dispensing, dispensing_id = id, inventory_id = inventoryid, transactionid, location,
+                          price, itemnumber,
+                          created, terminal_id, monthtime, inv_type_name)
+
+test.join <- inhale.one %>%
+  left_join(test.dispensing, by="inventory_id")
+
+review <- test.dispensing %>%
+  filter(inventory_id == inhale.one$inventory_id)
+
+review %>%
+  group_by(transactionid) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+  group_by(count) %>%
+  summarise(histo = n())
+
+
+tracking1.inv <- filter(test.inventory)
+
+review <- test.inventory %>%
+  filter(inv_type_name == "Useable Marijuana")
+  tail(test.inventory)
+  
+table(dispensing$inv_type_name)
+
+write.table(test.join, file="../data/Dec2016/cleaned/testing/testjoin3.csv", row.names=F,
+            col.names=T, sep=",")
+
+small.inventory <- filter(test.inventory, inventory_id %in% test.join$inventory_id)
+
+
+
+# inventoryLog variable questions ===========
+
+inventory.sample %>%
+  group_by(recalled) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+  group_by(count) %>%
+  summarise(histo = n())
+
+#locations counts ========
 
 locations <- locations %>%
   mutate(type_simp = ifelse(locationtypeNames == "Producer Tier 1" | locationtypeNames == "Producer Tier 2" |
@@ -571,6 +667,9 @@ roslyn <- roslyn %>%
 write.table(roslyn, file="../data/Dec2016/cleaned/samples/joints_roslyn.csv", row.names = F, col.names = T, sep=",")
 
 
+forks <- read.csv("../data/Dec2016/cleaned/testing/forks2.csv", header=T, sep=",")
+
+
 spokane <- spokane %>%
   left_join(inventory.types, by="inventorytype") %>%
   mutate(date = as.POSIXct(sessiontime, origin = "1970-01-01", tz="America/Los_Angeles"),
@@ -578,7 +677,55 @@ spokane <- spokane %>%
 write.table(spokane, file="../data/Dec2016/cleaned/samples/joints_spokane.csv", row.names = F, col.names = T, sep=",")
 
 
-
 # remove objects from environment
 # http://stackoverflow.com/questions/6190051/how-can-i-remove-all-objects-but-one-from-the-workspace-in-r
 # rm(list=setdiff(ls(), "x"))
+
+# inventory combinations ------
+
+inventoryCombinations <- readr::read_csv("../data/Dec2016/biotrackthc_inventorycombinations.csv")
+
+inventoryCombinations <- inventoryCombinations %>%
+  left_join(inventory.types, by = c("newtype" = "inventorytype")) %>%
+  left_join(inventory.types, by = c("oldtype" = "inventorytype")) %>%
+  rename(newtypename = inv_type_name.x, oldtypename = inv_type_name.y)
+
+inventoryCombinations$concatoldID <- str_detect(inventoryCombinations$oldid, ",")
+
+table(inventoryCombinations$concatoldID)
+
+sort(table(inventoryCombinations$newtypename))
+sort(table(inventoryCombinations$oldtypename))
+
+# labs -------
+potency <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_potency_analysis.csv")
+labsamples <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_samples.csv")
+potency_tidy <- potency %>%
+  # was going to use tidyr to spread variable names
+  # but some sample_ids have up to 15 tests
+  # so summarizing first, assuming max() is most accurate
+  # and that others might be missing values
+  # but need to check
+  dplyr::group_by(sample_id, name) %>%
+  dplyr::summarise(value = max(value)) %>%
+  # spread to get column each for THC, THCA, CBD, Total
+  tidyr::spread(name, value) %>%
+  # CBDA was a column of all null or 0
+  dplyr::select(-(CBDA)) %>%
+  dplyr::left_join(labsamples, by=c("sample_id" = "id")) %>%
+  # select only variables for retail set
+  # only including test_inventorytype and product name to confirm against inventory
+  # but should be duplicative
+  dplyr::select(sample_id, CBD, THC, THCA, Total, test_inventorytype = inventorytype, test_productname = product_name, inventoryparentid)
+
+
+# recreating Steve's retail df ------
+retail <- dispensing %>%
+  dplyr::left_join(inventory, by=c("inventoryid" = "id")) %>%
+  dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
+  dplyr::select(dispensingid = id, location = location.x, price, usableweight = usableweight.x, inv_type_name,
+                strain, productname, CBD, THC, THCA, Total, weight = weight.x, saletime = monthtime, inventoryid,
+                transactionid = transactionid.x, deleted = deleted.x, refunded, inventorytype = inventorytype.x,
+                inventoryparentid)
+
+
