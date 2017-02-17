@@ -35,7 +35,7 @@ write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv
 
 locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
 
-locations.name.type <- select(locations, name, locationtypeNames, retail_license = licensenum, location_id)
+locations.name.type <- select(locations, name, locationtypeNames, retail_license = licensenum, location_id, city)
 locations.name.city <- select(locations, name, licensenum, location_id, city)
 
 locationtypes <- read.csv("../data/Dec2016/cleaned/locations/locationtypes.csv", sep=",", header=T)
@@ -262,7 +262,7 @@ write.table(border.sales, file="../data/Dec2016/cleaned/samples/border_stores.cs
 # cleaning inventory --------------
 inventory.sample <- read.csv("../data/Dec2016/cleaned/samples/inventorysample2.csv", sep=",", header=T)
 inventoryLog.sample <- read.csv("../data/Dec2016/cleaned/samples/inventoryLogSample.csv", sep=",", header=T)
-inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory2.csv")
+inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 
 # cleaning inventory time based variables-------------- 
 inventory$sessiontime <- as.POSIXct(inventory$sessiontime,
@@ -370,7 +370,7 @@ write.table(inventory.sample, file="../data/Dec2016/cleaned/samples/inventorysam
 inventory.sample <- read.csv(file="../data/Dec2016/cleaned/samples/inventorysample2.csv")
 
 # cleaning inventory transfers --------------
-inventorytransfers <- read.csv("../data/Dec2016/biotrackthc_inventorytransfers.csv", sep=",", header=T)
+inventorytransfers <- readr::read_csv("../data/Dec2016/biotrackthc_inventorytransfers.csv")
 inventorytransfers <- left_join(inventorytransfers, locations.name.type, by=c("location" = "location_id"))
 # sampling for smaller files
 transfers.list <- sample(inventorytransfers$id, 20000, replace=F)
@@ -743,4 +743,14 @@ lm(formula = price ~ usableweight + inv_type_name, data=retail)
 
 class(retail$saletime)
 
-write.table(retail, file="../data/Dec2016/cleaned/retail_detail.csv", sep=",", row.names = F, col.names = T)
+write.table(retail, file="../data/Dec2016/cleaned/retail_detail.csv", sep=",",
+            row.names = F, col.names = T)
+
+# product names -----
+productnames <- inventory %>%
+  dplyr::group_by(productname) %>%
+  dplyr::summarise(count = n()) %>%
+  dplyr::arrange(productname)
+
+write.table(productnames, file="../data/Dec2016/cleaned/testing/productnames_count.csv",
+            sep=",", row.names = F, col.names = T)
