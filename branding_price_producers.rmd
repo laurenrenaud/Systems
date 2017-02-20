@@ -1,0 +1,132 @@
+---
+title: "Prestige & Branding by Producers"
+author: "Lauren Renaud"
+date: "February, 2017"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 4
+---
+```{r setup, echo=FALSE, include=FALSE, cache=TRUE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(gridExtra)
+
+# without potency ----------
+# first comparing price and producers without including THC / CBD numbers
+# question to think about: should we try comparing something like price per THC instead
+# of price? or is it ok to just compare on price, because higher THC is part of the 
+# higher prestige aspect? Should try both. Initially doing without THC join
+
+# first on inhalants only
+inhalants <- readr::read_csv("../data/Dec2016/cleaned/samples/inhalants.csv")
+
+
+```
+
+# Distribution of price and quantity sold
+
+```{r hist_price_quantity_noproducers}
+inhalants %>%
+  dplyr::group_by(inv_productname) %>%
+  dplyr::summarise(
+    num_sold = n(),
+    median_price = median(retail_price)
+    ) %>%
+  ggplot(aes(x=median_price, y=num_sold)) +
+  geom_point(alpha=0.5, color="red4") +
+  labs(
+    title = "Price and Quantity Sold",
+    x= "Mean Retail Price by Product",
+    y="Number of Product Sold"
+  ) 
+
+```
+
+
+# Distribution of Prices by Producer
+
+Looking at the mean, and median prices for a producer
+
+```{r hist_meanprice}
+# histogram / density plot of mean retail prices
+hist_mean <- inhalants %>%
+  dplyr::group_by(trans_name) %>%
+  dplyr::summarise(
+    mean_retail = mean(retail_price, na.rm=T)
+    #median_retail = median(retail_price, na.rm=T),
+    #max_retail = max(retail_price, na.rm=T)#,
+    # # transfer prices
+    # mean_transsales = mean(trans_saleprice, na.rm=T),
+    # median_transsales = median(trans_saleprice, na.rm=T),
+    # max_transsales = max(trans_saleprice, na.rm=T),
+    # mean_transunit = mean(trans_unitprice, na.rm=T),
+    # median_transunit = median(trans_unitprice, na.rm=T),
+    # max_transunit = max(trans_unitprice, na.rm=T)
+  ) %>%
+  ggplot(aes(x=mean_retail)) +
+  geom_density(alpha=0.5, fill="cadetblue3") +
+  labs(
+    title = "Mean Sale Price \nDistribution",
+    x= "Mean Retail Price by Producer",
+    y="Density"
+  ) 
+
+hist_median <- inhalants %>%
+  dplyr::group_by(trans_name) %>%
+  dplyr::summarise(
+    #mean_retail = mean(retail_price, na.rm=T)
+    median_retail = median(retail_price, na.rm=T)
+    #max_retail = max(retail_price, na.rm=T)#,
+    # # transfer prices
+    # mean_transsales = mean(trans_saleprice, na.rm=T),
+    # median_transsales = median(trans_saleprice, na.rm=T),
+    # max_transsales = max(trans_saleprice, na.rm=T),
+    # mean_transunit = mean(trans_unitprice, na.rm=T),
+    # median_transunit = median(trans_unitprice, na.rm=T),
+    # max_transunit = max(trans_unitprice, na.rm=T)
+  ) %>%
+  ggplot(aes(x=median_retail)) +
+  geom_density(alpha=0.5, fill="seagreen") +
+  labs(
+    title = "Median Sale Price \nDistribution",
+    x= "Median Retail Price by Producer",
+    y="Density"
+  ) 
+
+grid.arrange(hist_mean, hist_median, ncol=2)
+```
+
+# Distribution of average price by products sold
+
+We can also look at the relationship between mean or median price and number of products sold.
+
+```{r scatter_price_numsold}
+# histogram / density plot of mean retail prices
+inhalants %>%
+  dplyr::group_by(trans_name) %>%
+  dplyr::summarise(
+    mean_retail = mean(retail_price, na.rm=T),
+    num_sales = length(unique(dispensingid))
+    #median_retail = median(retail_price, na.rm=T),
+    #max_retail = max(retail_price, na.rm=T)#,
+    # # transfer prices
+    # mean_transsales = mean(trans_saleprice, na.rm=T),
+    # median_transsales = median(trans_saleprice, na.rm=T),
+    # max_transsales = max(trans_saleprice, na.rm=T),
+    # mean_transunit = mean(trans_unitprice, na.rm=T),
+    # median_transunit = median(trans_unitprice, na.rm=T),
+    # max_transunit = max(trans_unitprice, na.rm=T)
+  ) %>%
+  filter(num_sales < 1000000) %>%
+  ggplot(aes(x=mean_retail, y=num_sales)) +
+  geom_point(alpha=0.5, color="red4") +
+  labs(
+    title = "Producers mean sale price",
+    x= "Mean Retail Price by Producer",
+    y="Number of Products Sold by Producer"
+  ) 
+```
+  
+  

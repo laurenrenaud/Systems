@@ -1,5 +1,6 @@
 library(dplyr)
 library(readr)
+library(ggplot2)
 
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
 # locatons
@@ -52,7 +53,8 @@ transfers.select <- transfers %>%
   #filter(inventoryparentid %in% dis.select$inventoryid) %>%
   select(transferid = id, trans_inventoryid = inventoryid, trans_strain = strain, trans_location = location,
          trans_parentid = parentid, trans_inventorytype = inventorytype, trans_usableweight = usableweight,
-         outbound_license, inbound_license, inbound_location, trans_saleprice = saleprice, trans_unitprice = unitprice)
+         outbound_license, inbound_license, inbound_location, trans_saleprice = saleprice, 
+         trans_unitprice = unitprice)
 # get type names
 transfers.select <- left_join(transfers.select, inventory.types, by=c("trans_inventorytype" = "inventorytype"))
 # get location names
@@ -69,22 +71,23 @@ transfers.select <- transfers.select %>%
 
 # first on inhalants only
 inhalants <- dis.select %>%
-  dplyr::filter(retail_inv.type==24) %>%
+  dplyr::filter(retail_inv.type=="Marijuana Extract for Inhalation") %>%
   dplyr::left_join(inv.select, by="inventoryid") %>%
   dplyr::left_join(transfers.select, by=c("inv_inventoryparentid" = "trans_inventoryid"))
 
 names(inhalants)
 unique(inhalants$trans_inventorytype)
-#write.table(inhalants, file="../data/Dec2016/cleaned/samples/inhalants.csv", row.names=F, col.names = T, sep=",")
+write.table(inhalants, file="../data/Dec2016/cleaned/samples/inhalants.csv", row.names=F, col.names = T, sep=",")
 
 table(inhalants$trans_loc.type)
 unique(inhalants$trans_name)
 
+# histogram / density plot of mean retail prices
 inhalants %>%
   dplyr::group_by(trans_name) %>%
   dplyr::summarise(
     mean_retail = mean(retail_price, na.rm=T),
-    median_retail = median_sales(retail_price, na.rm=T),
+    median_retail = median(retail_price, na.rm=T),
     max_retail = max(retail_price, na.rm=T)#,
     # # transfer prices
     # mean_transsales = mean(trans_saleprice, na.rm=T),
@@ -94,15 +97,40 @@ inhalants %>%
     # median_transunit = median(trans_unitprice, na.rm=T),
     # max_transunit = max(trans_unitprice, na.rm=T)
   ) %>%
-  dplyr::arrange(mean_retail) %>%
-  ggplot(aes(x=trans_name, y=retail_price)) +
-  geom_point(alpha=0.5) +
+  ggplot(aes(x=mean_retail)) +
+  geom_density(alpha=0.5, fill="cadetblue3") +
   labs(
     title = "Producers mean sale price",
-    x= "Producers",
-    y="Mean sale price"
+    x= "Mean Retail Price by Producer",
+    y="Density"
   ) 
-  
-  
+
+
+
+# histogram / density plot of mean retail prices
+inhalants %>%
+  dplyr::group_by(trans_name) %>%
+  dplyr::summarise(
+    mean_retail = mean(retail_price, na.rm=T),
+    num_sales = length(unique(dispensingid))
+    #median_retail = median(retail_price, na.rm=T),
+    #max_retail = max(retail_price, na.rm=T)#,
+    # # transfer prices
+    # mean_transsales = mean(trans_saleprice, na.rm=T),
+    # median_transsales = median(trans_saleprice, na.rm=T),
+    # max_transsales = max(trans_saleprice, na.rm=T),
+    # mean_transunit = mean(trans_unitprice, na.rm=T),
+    # median_transunit = median(trans_unitprice, na.rm=T),
+    # max_transunit = max(trans_unitprice, na.rm=T)
+  ) %>%
+  filter(num_sales < 1000000) %>%
+  ggplot(aes(x=mean_retail, y=num_sales)) +
+  geom_point(alpha=0.5, color="darkslategray") +
+  labs(
+    title = "Producers mean sale price",
+    x= "Mean Retail Price by Producer",
+    y="Number of Products Sold by Producer"
+  ) 
+
   
   
