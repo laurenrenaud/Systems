@@ -7,11 +7,13 @@ output:
     toc: true
     toc_depth: 4
 ---
-```{r setup, echo=FALSE, include=FALSE, cache=TRUE}
+```{r setup, echo=FALSE, include=FALSE, cache.lazy = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 library(dplyr)
 library(readr)
 library(ggplot2)
 library(gridExtra)
+library(knitr)
 
 # without potency ----------
 # first comparing price and producers without including THC / CBD numbers
@@ -25,19 +27,40 @@ inhalants <- readr::read_csv("../data/Dec2016/cleaned/samples/inhalants.csv")
 
 ```
 
+# Product names by quantity sold
+
+Top 25 product names by quantity sold. This uses a combination of productname and producer name from the inventory transfers to estimate individual products created by specific producers.
+
+*Some `productname`s and some `trans_name`s are NA (more concerned about `trans_name`). Need to review further.*
+
+```{r prod_quantsold_producer}
+inhalants %>%
+  filter(!is.na(inv_productname), !is.na(trans_name)) %>%
+  group_by(inv_productname, trans_name) %>%
+  summarise(num_sold = n()) %>%
+  arrange(desc(num_sold)) %>%
+  head(25) %>%
+  kable(col.names=c("Product Name", "Producer Name", "Quantity Sold"))
+```
+
 # Distribution of price and quantity sold
 
-```{r hist_price_quantity_noproducers}
+Using the same combination of product name and producer name, this just looks at number sold and mean price for that product.
+
+```{r hist_price_quantity}
 inhalants %>%
-  dplyr::group_by(inv_productname) %>%
+  dplyr::filter(!is.na(inv_productname), !is.na(trans_name)) %>%
+  dplyr::group_by(inv_productname, trans_name) %>%
   dplyr::summarise(
     num_sold = n(),
     median_price = median(retail_price)
     ) %>%
+  filter(median_price < 250, num_sold < 50000,
+         num_sold > 100, !is.na(inv_productname)) %>%
   ggplot(aes(x=median_price, y=num_sold)) +
-  geom_point(alpha=0.5, color="red4") +
+  geom_point(alpha=0.5, color="darkslateblue") +
   labs(
-    title = "Price and Quantity Sold",
+    title = "Price and Quantity Sold, \nSales > 100, Median Price < $250",
     x= "Mean Retail Price by Product",
     y="Number of Product Sold"
   ) 
@@ -47,12 +70,13 @@ inhalants %>%
 
 # Distribution of Prices by Producer
 
-Looking at the mean, and median prices for a producer
+Looking at the mean, and median prices for a producer. This takes the mean for each product they sell, then takes the mean or median of those prices.
 
-```{r hist_meanprice}
+```{r hist_meanprice_meanproduct}
 # histogram / density plot of mean retail prices
-hist_mean <- inhalants %>%
-  dplyr::group_by(trans_name) %>%
+hist_median <- inhalants %>%
+  dplyr::filter(!is.na(inv_productname), !is.na(trans_name)) %>%
+  dplyr::group_by(trans_name, inv_productname) %>%
   dplyr::summarise(
     mean_retail = mean(retail_price, na.rm=T)
     #median_retail = median(retail_price, na.rm=T),
@@ -65,19 +89,22 @@ hist_mean <- inhalants %>%
     # median_transunit = median(trans_unitprice, na.rm=T),
     # max_transunit = max(trans_unitprice, na.rm=T)
   ) %>%
-  ggplot(aes(x=mean_retail)) +
+  dplyr::ungroup() %>% dplyr::group_by(trans_name) %>%
+  dplyr::summarise(median_producer_retail = median(mean_retail)) %>%
+  ggplot(aes(x=median_producer_retail)) +
   geom_density(alpha=0.5, fill="cadetblue3") +
   labs(
-    title = "Mean Sale Price \nDistribution",
-    x= "Mean Retail Price by Producer",
+    title = "Median Sale Price \nDistribution",
+    x= "Median Retail Price by Producer",
     y="Density"
   ) 
 
-hist_median <- inhalants %>%
-  dplyr::group_by(trans_name) %>%
+hist_mean <- inhalants %>%
+  dplyr::filter(!is.na(inv_productname), !is.na(trans_name)) %>%
+  dplyr::group_by(trans_name, inv_productname) %>%
   dplyr::summarise(
-    #mean_retail = mean(retail_price, na.rm=T)
-    median_retail = median(retail_price, na.rm=T)
+    mean_retail = mean(retail_price, na.rm=T)
+    #median_retail = median(retail_price, na.rm=T),
     #max_retail = max(retail_price, na.rm=T)#,
     # # transfer prices
     # mean_transsales = mean(trans_saleprice, na.rm=T),
@@ -87,25 +114,27 @@ hist_median <- inhalants %>%
     # median_transunit = median(trans_unitprice, na.rm=T),
     # max_transunit = max(trans_unitprice, na.rm=T)
   ) %>%
-  ggplot(aes(x=median_retail)) +
-  geom_density(alpha=0.5, fill="seagreen") +
+  dplyr::ungroup() %>% dplyr::group_by(trans_name) %>%
+  dplyr::summarise(mean_producer_retail = mean(mean_retail)) %>%
+  ggplot(aes(x=mean_producer_retail)) +
+  geom_density(alpha=0.5, fill="darkgreen") +
   labs(
-    title = "Median Sale Price \nDistribution",
-    x= "Median Retail Price by Producer",
+    title = "Mean Sale Price \nDistribution",
+    x= "Mean Retail Price by Producer",
     y="Density"
   ) 
 
-grid.arrange(hist_mean, hist_median, ncol=2)
+grid.arrange(hist_median,hist_mean, ncol=2)
 ```
 
 # Distribution of average price by products sold
 
-We can also look at the relationship between mean or median price and number of products sold.
+We can also look at the relationship between mean or median price and number of products sold, but grouped on producer. This again finds the average price of each product, then finds the median price of products sold by a given producer to get their average price (x axis). Then finds the total number of items sold for a product, and takes median of that to get median products sold for each product that a producer creates.
 
 ```{r scatter_price_numsold}
 # histogram / density plot of mean retail prices
 inhalants %>%
-  dplyr::group_by(trans_name) %>%
+  dplyr::group_by(trans_name, inv_productname) %>%
   dplyr::summarise(
     mean_retail = mean(retail_price, na.rm=T),
     num_sales = length(unique(dispensingid))
@@ -119,13 +148,16 @@ inhalants %>%
     # median_transunit = median(trans_unitprice, na.rm=T),
     # max_transunit = max(trans_unitprice, na.rm=T)
   ) %>%
-  filter(num_sales < 1000000) %>%
-  ggplot(aes(x=mean_retail, y=num_sales)) +
+  dplyr::filter(num_sales < 1000000) %>%
+  dplyr::ungroup() %>% dplyr::group_by(trans_name) %>%
+  dplyr::summarise(median_prod_retail = median(mean_retail),
+                   median_prod_sold = median(num_sales)) %>%
+  ggplot(aes(x=median_prod_retail, y=median_prod_sold)) +
   geom_point(alpha=0.5, color="red4") +
   labs(
-    title = "Producers mean sale price",
-    x= "Mean Retail Price by Producer",
-    y="Number of Products Sold by Producer"
+    title = "Sale Price & Quantity Sold",
+    x= "Mean Retail Price by Product, Grouped by Producer",
+    y="Median Products Sold, by Producer"
   ) 
 ```
   
