@@ -57,7 +57,7 @@ transfers.select <- transfers %>%
 transfers.select <- left_join(transfers.select, inventory.types, by=c("trans_inventorytype" = "inventorytype"))
 # get location names
 trans.loc.name.city <- select(locations, trans_name = name, trans_license = licensenum, location_id,
-                        trans_city = city, trans_loc.type = locationtypeNames)
+                              trans_city = city, trans_loc.type = locationtypeNames)
 transfers.select <- transfers.select %>%
   left_join(trans.loc.name.city, by=c("trans_location" = "location_id"))
 
@@ -93,4 +93,16 @@ inhalants %>%
     # mean_transunit = mean(trans_unitprice, na.rm=T),
     # median_transunit = median(trans_unitprice, na.rm=T),
     # max_transunit = max(trans_unitprice, na.rm=T)
-  )
+  ) %>%
+  dplyr::arrange(mean_retail) %>%
+  ggplot(aes(x=trans_name, y=retail_price)) +
+  geom_point(alpha=0.5) +
+  labs(
+    title = "Producers mean sale price",
+    x= "Producers",
+    y="Mean sale price"
+  ) 
+  
+  
+  
+  
