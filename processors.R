@@ -50,8 +50,8 @@ transfers.select <- transfers.select %>%
 # get processor transfers
 transfers.processor <- filter(transfers.select, trans_out_lisc %in% processor.loc$licensenum)
 transfers.processor <- inventory.select %>%
-  select(inv_inventoryparentid, inv_inventoryid, inv_date) %>%
-  left_join(transfers.processor, by=c("inv_inventoryparentid" = "trans_inventoryid"))
+  select(retail_invparentid = inv_inventoryparentid, inv_inventoryid, retail_inv_date = inv_date) %>%
+  left_join(transfers.processor, by=c("retail_invparentid" = "trans_inventoryid"))
 
 # clean transfers.processor ------------
 trans.proc.clean <- transfers.processor %>%
@@ -92,8 +92,8 @@ dispensing.history <- retail.select %>%
 # sample -------
 retail.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
 sample.dispensing.history <- dplyr::filter(dispensing.history, dispensingid %in% retail.list)
-#write.table(sample.dispensing.history, file="../data/Dec2016/cleaned/samples/retail_history_sample.csv", 
-#            sep=",", row.names = F, col.names = T)
+write.table(sample.dispensing.history, file="../data/Dec2016/cleaned/samples/retail_history_sample.csv", 
+            sep=",", row.names = F, col.names = T)
 
 # clean up environment --------
 rm(locations)
@@ -102,6 +102,10 @@ rm(transfers)
 rm(dispensing)
 rm(inventory.types)
 rm(trans.loc.name.city)
+
+
+
+########### RUN UP TO HERE ##################### -----------------
 
 # sample --------
 #retail.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
