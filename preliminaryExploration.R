@@ -5,6 +5,7 @@ library(tidyr)
 library(readr)
 library(lubridate)
 library(stringr)
+library(gridExtra)
 
 # from the sample data from Blackboard -----
 retailVancouver <- read.csv("../data/retail analysis dataset final - cmu.csv", sep=",", header=T)
@@ -720,11 +721,17 @@ potency_tidy <- potency %>%
   # only including test_inventorytype and product name to confirm against inventory
   # but should be duplicative
   dplyr::select(sample_id, CBD, THC, THCA, Total, test_inventorytype = inventorytype,
-                test_productname = product_name, inventoryparentid)
+                test_productname = product_name, inventoryparentid, strain) %>%
+  dplyr::mutate(cbd_thc_ratio = CBD / THC)
 
+unique(potency$name)
 length(unique(labsamples$inventoryparentid))
 length(unique(labsamples$id))
 length(unique(labsamples$location))
+sum(is.na(potency_tidy$strain))
+
+
+
 
 # recreating Steve's retail df ------
 retail <- dispensing %>%
