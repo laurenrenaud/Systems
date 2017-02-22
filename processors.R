@@ -4,96 +4,128 @@ library(readr)
 # set up ------------------
 # locatons
 locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
-locations.name.city <- select(locations, name, licensenum, location_id, city)
 processor.loc <- filter(locations, processor==1)
 
 # inventory
 inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
-inventory$sessiontime <- as.POSIXct(inventory$sessiontime,
+inventory$inv_date <- as.POSIXct(inventory$sessiontime,
                                     origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-inventory$inv_date <- as.Date(inventory$sessiontime)
-inventory <- rename(inventory, inventoryid = id)
+inventory$inv_date <- as.Date(inventory$inv_date)
 inventory <- left_join(inventory, inventory.types, by="inventorytype")
 inventory$sample_id <- as.numeric(inventory$sample_id)
-inventory.select <- select(inventory, inv_inventoryid = inventoryid, inv_strain = strain, inv_weight = weight,
+inventory.select <- select(inventory, inv_invid = id, inv_strain = strain, inv_weight = weight,
                            inv_location = location, inv_inv_type = inv_type_name, seized, inv_deleted = deleted,
-                           inv_usableweight = usableweight, inv_inventoryparentid = inventoryparentid,
+                           inv_usableweight = usableweight, inv_invparentid = inventoryparentid,
                            inv_productname = productname, inv_date)
 inventory.processor <- filter(inventory.select, inv_location %in% processor.loc$location_id)
 
 # transfers
 transfers <- readr::read_csv("../data/Dec2016/biotrackthc_inventorytransfers.csv")
 transfers$inventoryid <- as.numeric(transfers$inventoryid)
+transfers$usableweight <- as.numeric(transfers$usableweight)
+
 transfers.select <- transfers %>%
   #filter(inventoryparentid %in% dis.select$inventoryid) %>%
-  select(transferid = id, trans_inventoryid = inventoryid, trans_strain = strain, trans_location = location,
+  select(trans_id = id, trans_invid = inventoryid, trans_strain = strain, trans_location = location,
          trans_parentid = parentid, trans_invtype = inventorytype, trans_usableweight = usableweight,
-         trans_out_lisc = outbound_license, trans_in_lisc = inbound_license, trans_inbound_loc = inbound_location,
+         trans_weight = weight,
+         trans_out_lisc = outbound_license, trans_in_lisc = inbound_license, trans_in_loc = inbound_location,
          trans_saleprice = saleprice, trans_unitprice = unitprice)
+
 # get type names
-transfers.select <- left_join(transfers.select, inventory.types, by=c("trans_invtype" = "inventorytype"))
+transfers.select <- transfers.select %>%
+  left_join(inventory.types, by=c("trans_invtype" = "inventorytype")) %>%
+  rename(trans_invtypename = inv_type_name)
 # get location names
-trans.loc.name.city <- select(locations, trans_name = name, trans_license = licensenum, location_id,
-                              trans_city = city, trans_loc.type = locationtypeNames)
+loc.name.city <- select(locations, trans_name = name, trans_license = licensenum, location_id,
+                              trans_city = city, trans_loctype = locationtypeNames)
 transfers.select <- transfers.select %>%
-  left_join(trans.loc.name.city, by=c("trans_location" = "location_id"))
+  left_join(loc.name.city, by=c("trans_location" = "location_id"))
 transfers.select$trans_in_lisc <- as.integer(transfers.select$trans_in_lisc)
+
 # for transfers, get types of locations, in and outbound
-locations.name.city <- select(locations, name, licensenum, location_id, city, locationtypeNames)
+loc.name.city <- select(locations, name, licensenum, location_id, city, locationtypeNames)
+# this, adding location types, is where the count of trans_id and nrows loses sync ################
+# we get the same number of trans_ids as before
+# but now have 23853 extra rows, duplicate trans_ids
 transfers.select <- transfers.select %>%
-  left_join(locations.name.city, by=c("trans_out_lisc" = "licensenum")) %>%
-  rename(out_name = name, out_locid = location_id, out_city = city, out_type = locationtypeNames) %>%
-  left_join(locations.name.city, by=c("trans_in_lisc" = "licensenum")) %>%
-  rename(in_name = name, in_locid = location_id, in_city = city, in_type = locationtypeNames)
+  # the increase comes from joining on liscense numbers
+  # maybe because of the duplicate liscense numbers we found
+  # using location instead keeps trans_id the same as nrows
+  #left_join(loc.name.city, by=c("trans_out_lisc" = "licensenum")) %>%
+  #rename(t_out_name = name, t_out_locid = location_id, t_out_city = city, t_out_type = locationtypeNames) %>%
+  # trying taking out joining out, because I think that's just what's in there already, 
+  # that's the trans_city, trans_location?
+  left_join(loc.name.city, by=c("trans_in_loc" = "location_id")) %>%
+  rename(t_in_name = name, t_in_liscense = licensenum, t_in_city = city, t_in_type = locationtypeNames)
 
 # get processor transfers
 transfers.processor <- filter(transfers.select, trans_out_lisc %in% processor.loc$licensenum)
-transfers.processor <- inventory.select %>%
-  select(retail_invparentid = inv_inventoryparentid, inv_inventoryid, retail_inv_date = inv_date) %>%
-  left_join(transfers.processor, by=c("retail_invparentid" = "trans_inventoryid"))
-
-# clean transfers.processor ------------
-trans.proc.clean <- transfers.processor %>%
-  filter(trans_loc.type != "Producer Tier 2", 
-         trans_unitprice > 0,
-         trans_saleprice > 0,
-         !is.na(trans_inbound_loc)) 
+# trying to join to inventory to times
+# trying joining transfers inventory id to inventory id just to get *that* item, not going up a step
+inv.snip <- select(inventory.select, inv_invparentid, inv_invid, inv_date)
+transfers.processor <- left_join(transfers.processor, inv.snip, by=c("trans_invid" = "inv_invid"))
 
 # processor to retail only -----------
-process.to.retail <- trans.proc.clean %>%
-  filter(in_type=="Retailer" | in_type=="Retailer & Medical")
+process.to.retail <- transfers.processor %>%
+  filter(t_in_type=="Retailer" | t_in_type=="Retailer & Medical")
+
+
+# remove some anomolies
+proc.retail.clean <- process.to.retail %>%
+  filter(trans_loctype != "Producer Tier 2", 
+         trans_unitprice > 0,
+         trans_saleprice > 0,
+         !is.na(trans_in_loc))
+
+
+# sample processors to retail
+sample.list <- sample(proc.retail.clean$trans_id, 20000, replace=F)
+sample.process.to.retail <- dplyr::filter(proc.retail.clean, trans_id %in% sample.list)
+write.table(sample.process.to.retail, file="../data/Dec2016/cleaned/samples/processor_retail_sample.csv", 
+            sep=",", row.names = F, col.names = T)
+
 
 # connect to dispensing df
 # dispensing
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
-dispensing$monthtime <- as.POSIXct(dispensing$sessiontime,
+dispensing$saletime <- as.POSIXct(dispensing$sessiontime,
                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-dispensing$monthtime <- as.Date(dispensing$monthtime)
+dispensing$saletime <- as.Date(dispensing$saletime)
 dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
-dispensing$inv_type_name <- as.factor(dispensing$dis_inv_type)
-dispensing <- rename(dispensing, dispensingid = id)
+dispensing$inv_type_name <- as.factor(dispensing$inv_type_name)
 #dispensing$refunded <- as.logical(dispensing$refunded)
 # no.refund.list <- as.data.frame(dispensing$dispensingid[!dispensing$refunded])
 retail.select <- dispensing %>%
   #   # filtering out refunded for now. Make up 0.2% of df.
   #   filter(dispensingid %in% no.refund.list) %>%
-  select(dispensingid, retail_invid = inventoryid, retail_saletime = monthtime, 
+  select(dispensingid = id, retail_invid = inventoryid, retail_saletime = saletime, 
          retail_location = location,
-         retail_weight = weight, retail_inv.type = inv_type_name, retail_price = price)
+         retail_weight = weight, retail_inv_type = inv_type_name, retail_price = price)
 # get retail location names & cities
 loc.name.city <- select(locations, retail_name = name, retail_license = licensenum, location_id, 
                         retail_city = city, retail_type = locationtypeNames)
 retail.select <- left_join(retail.select, loc.name.city, by=c("retail_location" = "location_id"))
 
+# working through the logic:
+# dispening inventoryid gets you into the inventory
+# where teh parentid gets you the inventoryid that connecs to the
+# transfers / processors
+inv.simp <- select(inventory.select, inv_invid, inv_invparentid, inv_date)
 dispensing.history <- retail.select %>%
-  left_join(process.to.retail, by=c("retail_invid" = "inv_inventoryid"))
+  left_join(inv.simp, by=c("retail_invid" = "inv_invid")) %>%
+  rename(retail_inv_date = inv_date, retail_parentid = inv_invparentid) %>%
+  left_join(process.to.retail, by=c("retail_parentid" = "trans_invid"))
+
 
 # sample -------
-retail.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
-sample.dispensing.history <- dplyr::filter(dispensing.history, dispensingid %in% retail.list)
+sample.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
+sample.dispensing.history <- dplyr::filter(dispensing.history, dispensingid %in% sample.list)
 write.table(sample.dispensing.history, file="../data/Dec2016/cleaned/samples/retail_history_sample.csv", 
             sep=",", row.names = F, col.names = T)
+
+
 
 # clean up environment --------
 rm(locations)
