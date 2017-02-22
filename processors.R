@@ -66,11 +66,19 @@ transfers.processor <- filter(transfers.select, trans_out_lisc %in% processor.lo
 # trying joining transfers inventory id to inventory id just to get *that* item, not going up a step
 inv.snip <- select(inventory.select, inv_invparentid, inv_invid, inv_date)
 transfers.processor <- left_join(transfers.processor, inv.snip, by=c("trans_invid" = "inv_invid"))
+<<<<<<< HEAD
 
 # processor to retail only -----------
 process.to.retail <- transfers.processor %>%
   filter(t_in_type=="Retailer" | t_in_type=="Retailer & Medical")
 
+=======
+
+# processor to retail only -----------
+process.to.retail <- transfers.processor %>%
+  filter(t_in_type=="Retailer" | t_in_type=="Retailer & Medical")
+
+>>>>>>> 555c56a4f484877a0aebd17308625cba6c05e632
 
 # remove some anomolies
 proc.retail.clean <- process.to.retail %>%
