@@ -162,7 +162,7 @@ inhalants %>%
 ```
   
   
-```{r variance}
+```{r variance, echo=FALSE, cache.lazy = FALSE, warning=FALSE}
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
 potency <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_potency_analysis.csv")
 labsamples <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_samples.csv")
@@ -204,47 +204,47 @@ potency_tidy %>%
     title = "Variance in Strain Potency - All",
     x= "Mean THC by Strain Name",
     y="Standard Deviation THC by Strain Name"
-  ) 
+  )
 
-# mean log of standard deviation
-logsd <- potency_tidy %>%
-  group_by(strain) %>%
-  filter(!is.na(strain)) %>%
-  summarise(
-    meanTHC = mean(THC, na.rm=T),
-    sdTHClog = log(sd(THC, na.rm=T)),
-    meanCBD = mean(CBD, na.rm=T),
-    sdCBD = sd(CBD, na.rm=T)
-  ) %>%
-  filter(meanTHC < 100) %>%
-  ggplot(aes(x=meanTHC, y=sdTHClog)) +
-  geom_point(alpha=0.5, color="olivedrab") +
-  labs(
-    title = "Variance in Strain Potency - All",
-    x= "Mean THC by Strain Name",
-    y="Log of Std Dev THC by Strain Name"
-  ) 
-
-# number of diff product types by strain
-logsdmean <- potency_tidy %>%
-  group_by(strain) %>%
-  filter(!is.na(strain)) %>%
-  summarise(
-    meanTHClog = log(mean(THC, na.rm=T)),
-    sdTHClog = log(sd(THC, na.rm=T))#,
-    #meanCBD = mean(CBD, na.rm=T),
-    #sdCBD = sd(CBD, na.rm=T)
-  ) %>%
-  #filter(meanTHC < 100) %>%
-  ggplot(aes(x=meanTHClog, y=sdTHClog)) +
-  geom_point(alpha=0.5, color="olivedrab") +
-  labs(
-    title = "Variance in Strain Potency",
-    x= "Log of Mean THC by Strain Name",
-    y="Log of Std Dev THC by Strain Name"
-  ) 
-
-grid.arrange(logsd,logsdmean, ncol=2)
+# # mean log of standard deviation
+# logsd <- potency_tidy %>%
+#   group_by(strain) %>%
+#   filter(!is.na(strain)) %>%
+#   summarise(
+#     meanTHC = mean(THC, na.rm=T),
+#     sdTHClog = log(sd(THC, na.rm=T)),
+#     meanCBD = mean(CBD, na.rm=T),
+#     sdCBD = sd(CBD, na.rm=T)
+#   ) %>%
+#   filter(meanTHC < 100) %>%
+#   ggplot(aes(x=meanTHC, y=sdTHClog)) +
+#   geom_point(alpha=0.5, color="olivedrab") +
+#   labs(
+#     title = "Variance in Strain Potency - All",
+#     x= "Mean THC by Strain Name",
+#     y="Log of Std Dev THC by Strain Name"
+#   ) 
+# 
+# # number of diff product types by strain
+# logsdmean <- potency_tidy %>%
+#   group_by(strain) %>%
+#   filter(!is.na(strain)) %>%
+#   summarise(
+#     meanTHClog = log(mean(THC, na.rm=T)),
+#     sdTHClog = log(sd(THC, na.rm=T))#,
+#     #meanCBD = mean(CBD, na.rm=T),
+#     #sdCBD = sd(CBD, na.rm=T)
+#   ) %>%
+#   #filter(meanTHC < 100) %>%
+#   ggplot(aes(x=meanTHClog, y=sdTHClog)) +
+#   geom_point(alpha=0.5, color="olivedrab") +
+#   labs(
+#     title = "Variance in Strain Potency",
+#     x= "Log of Mean THC by Strain Name",
+#     y="Log of Std Dev THC by Strain Name"
+#   ) 
+# 
+# grid.arrange(logsd,logsdmean, ncol=2)
 
 # by product type ----------
 potency_tidy %>%
