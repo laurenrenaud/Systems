@@ -1,0 +1,123 @@
+---
+title: "Inventory Holding"
+author: "Lauren Renaud"
+date: "February, 2017"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 4
+---
+```{r setup, echo=FALSE, include=FALSE, cache.lazy = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+library(RColorBrewer)
+
+# pull in & clean dfs ------
+# locatons
+locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
+locations.name.city <- select(locations, retailname = name, licensenum, location_id, city)
+retail.loc <- filter(locations, retail==1)
+# inventory
+inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
+inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
+inventory$inv_date <- as.POSIXct(inventory$sessiontime,
+                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+inventory$inv_date <- as.Date(inventory$inv_date)
+inventory <- rename(inventory, inventoryid = id)
+inventory <- left_join(inventory, inventory.types, by="inventorytype")
+inventory.select <- inventory %>%
+  #filter(location %in% retail.loc$location_id) %>%
+  select(inventoryid, inv_date, inv_type_name, strain, weight, inv_location = location, 
+         nv_usableweight = usableweight, productname)
+
+# dispensing
+dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
+dispensing$saletime <- as.POSIXct(dispensing$sessiontime,
+                                   origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+dispensing$saletime <- as.Date(dispensing$saletime)
+dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
+dispensing$inv_type_name <- as.factor(dispensing$inv_type_name)
+dispensing.select <- dispensing %>%
+  select(dispensingid = id, saletime, sale_type = inv_type_name, sale_loc = location, sale_price = price,
+         sale_weight = weight, inventoryid, sale_useweight = usableweight)
+
+retail.inventory <- dispensing.select %>%
+  dplyr::left_join(inventory.select, by="inventoryid")
+retail.inventory$time_in_inv <- as.numeric(difftime(retail.inventory$saletime, retail.inventory$inv_date,
+                                                    units = "days"))
+
+# % of negative numbers
+length(retail.inventory$time_in_inventory[retail.inventory$time_in_inventory < 0]) / nrow(retail.inventory)
+
+```
+
+# Distribution of Inventory Holding Times
+
+```{r hist}
+# histogram of all types
+retail.inventory %>%
+  filter(time_in_inv > 0) %>%
+  ggplot(aes(x=time_in_inv)) +
+  geom_histogram(fill="darkgreen") +
+  labs(
+    title="Time Spent in Stores' Inventory (All)",
+    x="Days in Inventory"
+  )
+
+# plotting densities by type
+retail.inventory %>%
+  filter(time_in_inv > 0) %>%
+  ggplot(aes(x=time_in_inv)) +
+  geom_density(alpha=0.7) +
+  facet_wrap("sale_type") +
+  #scale_fill_manual(values=plotcolors) +
+  #scale_color_manual(values=plotcolors) +
+  scale_color_brewer(palette="BuGn") +
+  scale_fill_brewer(palette="BuGn") +
+  labs(
+    title="Density of Time Spent in Stores' Inventory By Type",
+    x="Days in Inventory",
+    y="Density of Occurance"
+  )
+
+# fitlered to <100 days
+# plotting densities by type
+retail.inventory %>%
+  filter(time_in_inv > 0, time_in_inv < 100) %>%
+  ggplot(aes(x=time_in_inv)) +
+  geom_density(alpha=0.7) +
+  facet_wrap("sale_type") +
+  scale_fill_manual(values="darkgreen") +
+  scale_color_manual(values="darkgreen") +
+  #scale_color_brewer(palette="BuGn") +
+  #scale_fill_brewer(palette="BuGn") +
+  labs(
+    title="Density of Time Spent in Stores' Inventory By Type",
+    x="Days in Inventory",
+    y="Density of Occurance"
+  )
+```
+
+# Comparing Distributions of Inventory Holding Times
+
+```{r quant_plot}
+retail.inventory %>%
+  filter(time_in_inv > 0) %>%
+  filter(sale_type=="Usable Marijuana" | sale_type=="Solid Marijuana Infused Edible",
+         sale_type=="Marijuana Extract for Inhalation" | sale_type=="Liquid Marijuana Infused Edible") %>%
+  ggplot(aes(x=time_in_inv)) +
+  geom_density(alpha=0.3) +
+  labs(title="Inventory Holding Times, Top Types", x="Days in Inventory", y="Density")
+  # ggplot(aes(sample = time_in_inv, color=sale_type)) + 
+  # stat_qq(distribution="qunif") + 
+  # labs(x="Quantiles", y="Days Held in Inventory", color = "Type", 
+  #      title = "Distribution of Time in Inventory, Top Types") +
+  # scale_color_brewer(palette="BuGn"), color=sale_type, fill=sale_type
+  
+```
+
