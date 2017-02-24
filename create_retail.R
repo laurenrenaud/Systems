@@ -48,7 +48,7 @@ potency_tidy <- potency %>%
 
 # recreating Steve's retail df ------
 retail <- dispensing %>%
-  dplyr::left_join(inventory, by="inventoryid") %>%
+  dplyr::left_join(inventory.retail, by="inventoryid") %>%
   dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
   dplyr::select(dispensingid, location = location.x, price, usableweight = usableweight.x,
                 inv_type_name = inv_type_name.x, inventoryid = inventoryid.x,
@@ -60,7 +60,7 @@ retail <- dispensing %>%
 # sample -----
 retail.list <- sample(retail$dispensingid, 20000, replace=F)
 retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
-write.table(retail.sample, file="../data/Dec2016/cleaned/retail_sample.csv", sep=",", row.names = F, col.names = T)
+write.table(retail.sample, file="../data/Dec2016/cleaned/samples/retail_sample.csv", sep=",", row.names = F, col.names = T)
 #lm(formula = price ~ usableweight + inv_type_name + CBD + THC + Total, data=retail)
 
 #write.table(retail, file="../data/Dec2016/cleaned/retail_detail.csv", sep=",", row.names = F, col.names = T)
