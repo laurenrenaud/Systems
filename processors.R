@@ -66,19 +66,11 @@ transfers.processor <- filter(transfers.select, trans_out_lisc %in% processor.lo
 # trying joining transfers inventory id to inventory id just to get *that* item, not going up a step
 inv.snip <- select(inventory.select, inv_invparentid, inv_invid, inv_date)
 transfers.processor <- left_join(transfers.processor, inv.snip, by=c("trans_invid" = "inv_invid"))
-<<<<<<< HEAD
 
 # processor to retail only -----------
 process.to.retail <- transfers.processor %>%
   filter(t_in_type=="Retailer" | t_in_type=="Retailer & Medical")
 
-=======
-
-# processor to retail only -----------
-process.to.retail <- transfers.processor %>%
-  filter(t_in_type=="Retailer" | t_in_type=="Retailer & Medical")
-
->>>>>>> 555c56a4f484877a0aebd17308625cba6c05e632
 
 # remove some anomolies
 proc.retail.clean <- process.to.retail %>%
@@ -94,45 +86,53 @@ sample.process.to.retail <- dplyr::filter(proc.retail.clean, trans_id %in% sampl
 write.table(sample.process.to.retail, file="../data/Dec2016/cleaned/samples/processor_retail_sample.csv", 
             sep=",", row.names = F, col.names = T)
 
-
-# connect to dispensing df
-# dispensing
+## cleaning dispensing for comparing
+## wholesale and retail prices
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
-dispensing$saletime <- as.POSIXct(dispensing$sessiontime,
-                                   origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-dispensing$saletime <- as.Date(dispensing$saletime)
-dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
-dispensing$inv_type_name <- as.factor(dispensing$inv_type_name)
-#dispensing$refunded <- as.logical(dispensing$refunded)
-# no.refund.list <- as.data.frame(dispensing$dispensingid[!dispensing$refunded])
-retail.select <- dispensing %>%
-  #   # filtering out refunded for now. Make up 0.2% of df.
-  #   filter(dispensingid %in% no.refund.list) %>%
-  select(dispensingid = id, retail_invid = inventoryid, retail_saletime = saletime, 
-         retail_location = location,
-         retail_weight = weight, retail_inv_type = inv_type_name, retail_price = price)
-# get retail location names & cities
-loc.name.city <- select(locations, retail_name = name, retail_license = licensenum, location_id, 
-                        retail_city = city, retail_type = locationtypeNames)
-retail.select <- left_join(retail.select, loc.name.city, by=c("retail_location" = "location_id"))
-
-# working through the logic:
-# dispening inventoryid gets you into the inventory
-# where teh parentid gets you the inventoryid that connecs to the
-# transfers / processors
-inv.simp <- select(inventory.select, inv_invid, inv_invparentid, inv_date)
-dispensing.history <- retail.select %>%
-  left_join(inv.simp, by=c("retail_invid" = "inv_invid")) %>%
-  rename(retail_inv_date = inv_date, retail_parentid = inv_invparentid) %>%
-  left_join(process.to.retail, by=c("retail_parentid" = "trans_invid"))
+dispensing.select <- select(dispensing, dispensingid = id, weight, saletime = sessiontime, price, inventorytype)
+dispensing.select$saletime <- as.POSIXct(dispensing.select$saletime,
+                                  origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+dispensing.select$saletime <- as.Date(dispensing.select$saletime)
 
 
-# sample -------
-sample.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
-sample.dispensing.history <- dplyr::filter(dispensing.history, dispensingid %in% sample.list)
-write.table(sample.dispensing.history, file="../data/Dec2016/cleaned/samples/retail_history_sample.csv", 
-            sep=",", row.names = F, col.names = T)
-
+# # connect to dispensing df
+# # dispensing
+# dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
+# dispensing$saletime <- as.POSIXct(dispensing$sessiontime,
+#                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+# dispensing$saletime <- as.Date(dispensing$saletime)
+# dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
+# dispensing$inv_type_name <- as.factor(dispensing$inv_type_name)
+# #dispensing$refunded <- as.logical(dispensing$refunded)
+# # no.refund.list <- as.data.frame(dispensing$dispensingid[!dispensing$refunded])
+# retail.select <- dispensing %>%
+#   #   # filtering out refunded for now. Make up 0.2% of df.
+#   #   filter(dispensingid %in% no.refund.list) %>%
+#   select(dispensingid = id, retail_invid = inventoryid, retail_saletime = saletime, 
+#          retail_location = location,
+#          retail_weight = weight, retail_inv_type = inv_type_name, retail_price = price)
+# # get retail location names & cities
+# loc.name.city <- select(locations, retail_name = name, retail_license = licensenum, location_id, 
+#                         retail_city = city, retail_type = locationtypeNames)
+# retail.select <- left_join(retail.select, loc.name.city, by=c("retail_location" = "location_id"))
+# 
+# # working through the logic:
+# # dispening inventoryid gets you into the inventory
+# # where teh parentid gets you the inventoryid that connecs to the
+# # transfers / processors
+# # 17:30 2/22: this does not work
+# inv.simp <- select(inventory.select, inv_invid, inv_invparentid, inv_date)
+# dispensing.history <- retail.select %>%
+#   left_join(inv.simp, by=c("retail_invid" = "inv_invid")) %>%
+#   rename(retail_inv_date = inv_date, retail_parentid = inv_invparentid) %>%
+#   left_join(process.to.retail, by=c("retail_parentid" = "trans_invid"))
+# 
+# 
+# # sample -------
+# sample.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
+# sample.dispensing.history <- dplyr::filter(dispensing.history, dispensingid %in% sample.list)
+# write.table(sample.dispensing.history, file="../data/Dec2016/cleaned/samples/retail_history_sample.csv", 
+#             sep=",", row.names = F, col.names = T)
 
 
 # clean up environment --------
