@@ -85,6 +85,7 @@ retail.inventory %>%
     y="Density of Occurance"
   )
 
+
 # fitlered to <100 days
 # plotting densities by type
 retail.inventory %>%
