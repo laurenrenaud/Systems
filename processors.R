@@ -1,5 +1,6 @@
 library(dplyr)
 library(readr)
+library(tidyr)
 
 # set up ------------------
 # locatons
@@ -39,7 +40,7 @@ transfers.select <- transfers.select %>%
   rename(trans_invtypename = inv_type_name)
 # get location names
 loc.name.city <- select(locations, trans_name = name, trans_license = licensenum, location_id,
-                              trans_city = city, trans_loctype = locationtypeNames)
+                              trans_city = city, trans_loctype = locationtypeNames,)
 transfers.select <- transfers.select %>%
   left_join(loc.name.city, by=c("trans_location" = "location_id"))
 transfers.select$trans_in_lisc <- as.integer(transfers.select$trans_in_lisc)
@@ -89,11 +90,80 @@ write.table(sample.process.to.retail, file="../data/Dec2016/cleaned/samples/proc
 ## cleaning dispensing for comparing
 ## wholesale and retail prices
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
-dispensing.select <- select(dispensing, dispensingid = id, weight, saletime = sessiontime, price, inventorytype)
+dispensing.select <- select(dispensing, dispensingid = id, weight, saletime = sessiontime, 
+                            price, inventorytype, location)
 dispensing.select$saletime <- as.POSIXct(dispensing.select$saletime,
                                   origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
 dispensing.select$saletime <- as.Date(dispensing.select$saletime)
 
+avg.saleprice <- dispensing.select %>%
+  group_by(inventorytype) %>%
+  summarise(avg_saleprice = median(price, na.rm=T))
+
+avg.procprice <- process.to.retail %>%
+  group_by(trans_invtype) %>%
+  summarise(avg_processorprice = median(trans_unitprice, na.rm=T))
+
+avg.saleprice %>%
+  filter(!is.na(inventorytype)) %>%
+  left_join(avg.procprice, by=c("inventorytype" = "trans_invtype")) %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
+  ggplot(aes(x=inv_type_name, y=avg_price, fill=supplystep)) +
+  geom_bar(stat="identity", position="dodge") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+# avg markup by type
+avg.saleprice %>%
+  filter(!is.na(inventorytype)) %>%
+  left_join(avg.procprice, by=c("inventorytype" = "trans_invtype")) %>%
+  group_by(inventorytype) %>%
+  mutate(
+    avg_markup_abs = avg_saleprice - avg_processorprice,
+    avg_markup_perc = (avg_saleprice - avg_processorprice) / avg_saleprice
+  ) %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  ggplot(aes(x=reorder(inv_type_name, desc(avg_markup_abs)), y=avg_markup_abs)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+### including time
+avg.sale.month <- dispensing.select %>%
+  mutate(month = floor_date(saletime, "month")) %>%
+  group_by(inventorytype, month) %>%
+  summarise(avg_saleprice = median(price, na.rm=T))
+
+avg.proc.month <- process.to.retail %>%
+  mutate(month = floor_date(inv_date, "month")) %>%
+  group_by(trans_invtype, month) %>%
+  summarise(avg_processorprice = median(trans_unitprice, na.rm=T))
+
+
+avg.proc.month %>%
+  left_join(inventory.types, by=c("trans_invtype" = "inventorytype")) %>%
+  ggplot(aes(x=month, y=avg_processorprice)) +
+  geom_line() +
+  facet_wrap("inv_type_name")
+
+avg.sale.month %>%
+  filter(!is.na(inventorytype), inventorytype !=26) %>%
+  left_join(avg.procprice, by=c("month" = "month", "inventorytype" = "trans_invtype")) %>%
+  #left_join(inventory.types, by="inventorytype") %>%
+  tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
+  ggplot(aes(x=month, y=avg_price, color=supplystep)) +
+  geom_line() +
+  facet_wrap("inventorytype") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+test <- avg.sale.month %>%
+  filter(!is.na(inventorytype), inventorytype !=26) %>%
+  left_join(avg.procprice, by=c("inventorytype" = "trans_invtype")) %>%
+  #left_join(inventory.types, by="inventorytype") %>%
+  tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) 
+
+
+## create price of each over time, see if the whoelsale and retail prices are moving the same
+  
 
 # # connect to dispensing df
 # # dispensing
