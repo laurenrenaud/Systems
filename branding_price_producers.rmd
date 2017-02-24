@@ -246,6 +246,8 @@ potency_tidy %>%
 # 
 # grid.arrange(logsd,logsdmean, ncol=2)
 
+# try with coefficient of radiation instead of standard deviation
+
 # by product type ----------
 potency_tidy %>%
   group_by(strain, inv_type_name) %>%
@@ -267,3 +269,10 @@ potency_tidy %>%
   facet_wrap("inv_type_name", ncol = 4) 
 
 ```
+
+Question:
+
+ - Does strain popularity change over time? And does that change the potency / quality / consistency, because others are using the strain name?
+ - See if mean changed over time and while standard deviation stays the same.
+ - See if you can follow particular flower lot, see if different producers or retailers are giving it same or different product names.
+ - Take particular product names from retail that are popular and also specific, work backwards to THC results to see variability.
