@@ -761,3 +761,13 @@ productnames <- inventory %>%
 
 write.table(productnames, file="../data/Dec2016/cleaned/testing/productnames_count.csv",
             sep=",", row.names = F, col.names = T)
+
+# simplify location types
+loc.types <- readr::read_csv("../data/Dec2016/cleaned/locations/locationtypes.csv")
+loc.types <- rename(loc.types, type = locationtypeNames, loctypeCode = locationtypeCodes)
+loc.types$typesimp <- ifelse(grepl("Producer + Processor", loc.types$type), "Producer-Processor",
+                                ifelse(grepl("Producer", loc.types$type), "Producer",
+                                       ifelse(grepl("Processor", loc.types$type), "Processor",
+                                              "Retailer")))
+#write.table(loc.types, "../data/Dec2016/cleaned/locations/locationtypes.csv", row.names=F, sep=",")
+
