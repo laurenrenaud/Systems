@@ -87,8 +87,9 @@ sample.process.to.retail <- dplyr::filter(proc.retail.clean, trans_id %in% sampl
 write.table(sample.process.to.retail, file="../data/Dec2016/cleaned/samples/processor_retail_sample.csv", 
             sep=",", row.names = F, col.names = T)
 
+
+## wholesale and retail prices -------------
 ## cleaning dispensing for comparing
-## wholesale and retail prices
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
 dispensing.select <- select(dispensing, dispensingid = id, weight, saletime = sessiontime, 
                             price, inventorytype, location)
@@ -96,6 +97,7 @@ dispensing.select$saletime <- as.POSIXct(dispensing.select$saletime,
                                   origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
 dispensing.select$saletime <- as.Date(dispensing.select$saletime)
 
+# overall comparision, without time
 avg.saleprice <- dispensing.select %>%
   group_by(inventorytype) %>%
   summarise(avg_saleprice = median(price, na.rm=T))
@@ -129,40 +131,35 @@ avg.saleprice %>%
 
 ### including time
 avg.sale.month <- dispensing.select %>%
-  mutate(month = floor_date(saletime, "month")) %>%
-  group_by(inventorytype, month) %>%
-  summarise(avg_saleprice = median(price, na.rm=T))
+  mutate(monthyear = floor_date(saletime, "month")) %>%
+  group_by(inventorytype, monthyear) %>%
+  summarise(avg_saleprice = median(price, na.rm=T)) %>%
+  # for some reason the join didn't work on the monthyear / date variable
+  # so I created a numeric variable for joining the dataframes
+  mutate(monthjoin = as.numeric(monthyear))
 
 avg.proc.month <- process.to.retail %>%
-  mutate(month = floor_date(inv_date, "month")) %>%
-  group_by(trans_invtype, month) %>%
-  summarise(avg_processorprice = median(trans_unitprice, na.rm=T))
+  mutate(monthyear = floor_date(inv_date, "month")) %>%
+  group_by(trans_invtype, monthyear) %>%
+  summarise(avg_processorprice = median(trans_unitprice, na.rm=T)) %>%
+  # for some reason the join didn't work on the monthyear / date variable
+  # so I created a numeric variable for joining the dataframes
+  mutate(monthjoin = as.numeric(monthyear))
 
-
-avg.proc.month %>%
-  left_join(inventory.types, by=c("trans_invtype" = "inventorytype")) %>%
-  ggplot(aes(x=month, y=avg_processorprice)) +
-  geom_line() +
-  facet_wrap("inv_type_name")
-
+## line graph of sale price and producer price, over time
 avg.sale.month %>%
-  filter(!is.na(inventorytype), inventorytype !=26) %>%
-  left_join(avg.procprice, by=c("month" = "month", "inventorytype" = "trans_invtype")) %>%
-  #left_join(inventory.types, by="inventorytype") %>%
+  left_join(avg.proc.month, by=c("monthjoin", "inventorytype" = "trans_invtype")) %>%
+  # needed to drop and rename some variables because of the weird join
+  select(inventorytype, month = monthyear.x, avg_saleprice, avg_processorprice) %>%
+  # gather so we get one value per row
   tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  filter(!is.na(inventorytype), inv_type_name!="Capsule", inv_type_name!="Suppository",
+                inv_type_name!="Tincture") %>%
   ggplot(aes(x=month, y=avg_price, color=supplystep)) +
   geom_line() +
-  facet_wrap("inventorytype") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-
-test <- avg.sale.month %>%
-  filter(!is.na(inventorytype), inventorytype !=26) %>%
-  left_join(avg.procprice, by=c("inventorytype" = "trans_invtype")) %>%
-  #left_join(inventory.types, by="inventorytype") %>%
-  tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) 
-
-
-## create price of each over time, see if the whoelsale and retail prices are moving the same
+  facet_wrap("inv_type_name") +
+  theme(legend.position=c(0.65,0.15))
   
 
 # # connect to dispensing df
@@ -203,49 +200,49 @@ test <- avg.sale.month %>%
 # sample.dispensing.history <- dplyr::filter(dispensing.history, dispensingid %in% sample.list)
 # write.table(sample.dispensing.history, file="../data/Dec2016/cleaned/samples/retail_history_sample.csv", 
 #             sep=",", row.names = F, col.names = T)
-
-
-# clean up environment --------
-rm(locations)
-rm(inventory)
-rm(transfers)
-rm(dispensing)
-rm(inventory.types)
-rm(trans.loc.name.city)
-
-
-
-########### RUN UP TO HERE ##################### -----------------
-
-# sample --------
-#retail.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
-#retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
-#write.table(retail.sample, file="../data/Dec2016/cleaned/retail_sample.csv", sep=",", row.names = F, col.names = T)
-
-
-# clustering on types ------------
-
-
-
-
-# testing & anomolies --------------
-
-# testing / exploring why some inbound locations are NA
-# still have inbound liscense number so could just be error?
-trans_in_loc_NA <- transfers.processor %>%
-  filter(is.na(transfers.processor$trans_inbound_loc)) %>%
-  select(transferid, trans_out_lisc, trans_in_lisc, trans_inbound_loc, trans_invtype,
-         trans_saleprice, trans_unitprice) %>%
-  left_join(locations.name.city, by=c("trans_out_lisc" = "licensenum")) %>%
-  rename(out_name = name, out_locid = location_id, out_city = city) %>%
-  left_join(locations.name.city, by=c("trans_in_lisc" = "licensenum")) %>%
-  rename(in_name = name, in_locid = location_id, in_city = city)
-#write.table(trans_in_loc_NA, file="../data/Dec2016/cleaned/testing/transfers_locationNA.csv", sep=",", row.names=F)
-
-
-# processors <- inventory.processor %>%
-#   dplyr::left_join(transfers.select, by=c("inv_inventoryparentid" = "trans_inventoryid")) %>%
-#   dplyr::filter(trans_saleprice > 0, trans_unitprice > 0)
+# 
+# 
+# # clean up environment --------
+# rm(locations)
+# rm(inventory)
+# rm(transfers)
+# rm(dispensing)
+# rm(inventory.types)
+# rm(trans.loc.name.city)
+# 
+# 
+# 
+# ########### RUN UP TO HERE ##################### -----------------
+# 
+# # sample --------
+# #retail.list <- sample(dispensing.history$dispensingid, 20000, replace=F)
+# #retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
+# #write.table(retail.sample, file="../data/Dec2016/cleaned/retail_sample.csv", sep=",", row.names = F, col.names = T)
+# 
+# 
+# # clustering on types ------------
+# 
+# 
+# 
+# 
+# # testing & anomolies --------------
+# 
+# # testing / exploring why some inbound locations are NA
+# # still have inbound liscense number so could just be error?
+# trans_in_loc_NA <- transfers.processor %>%
+#   filter(is.na(transfers.processor$trans_inbound_loc)) %>%
+#   select(transferid, trans_out_lisc, trans_in_lisc, trans_inbound_loc, trans_invtype,
+#          trans_saleprice, trans_unitprice) %>%
+#   left_join(locations.name.city, by=c("trans_out_lisc" = "licensenum")) %>%
+#   rename(out_name = name, out_locid = location_id, out_city = city) %>%
+#   left_join(locations.name.city, by=c("trans_in_lisc" = "licensenum")) %>%
+#   rename(in_name = name, in_locid = location_id, in_city = city)
+# #write.table(trans_in_loc_NA, file="../data/Dec2016/cleaned/testing/transfers_locationNA.csv", sep=",", row.names=F)
+# 
+# 
+# # processors <- inventory.processor %>%
+# #   dplyr::left_join(transfers.select, by=c("inv_inventoryparentid" = "trans_inventoryid")) %>%
+# #   dplyr::filter(trans_saleprice > 0, trans_unitprice > 0)
 
 # there are some duplicate liscense numbers -- trying to explore
 dup.license <- locations %>%
