@@ -324,25 +324,25 @@ test <- inven.dispense %>%
 # from biotrackthc_inventory
 # group by location;
 # 
-mindate <- read.csv("../data/Dec2016/cleaned/inventorymindate.csv", header=T, sep=",")
-maxdate <- read.csv("../data/Dec2016/cleaned/maxsessiontime.csv", header=T, sep=",")
-mindate$min.sessiontime. <- as.POSIXct(mindate$min.sessiontime.,
-                                       origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-maxdate$max.sessiontime. <- as.POSIXct(maxdate$max.sessiontime.,
-                                       origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-locationDates <- left_join(mindate, maxdate, by="location")
 
-locationDates <- rename(locationDates, minDate = min.sessiontime., maxDate = max.sessiontime.)
+
+# first opened + length of time ------
+
+reportmindate <- floor_date(as.POSIXct(1394560864, origin = "1970-01-01", tz="America/Los_Angeles"), "month") # from querying db inventory  
+reportmaxdate <- as.Date("2016-10-01")
+
 locationDates <- read.csv("../data/Dec2016/cleaned/locations/locationDates.csv")
 locationDates$minDate <- as.Date(locationDates$minDate)
 locationDates$maxDate <- as.Date(locationDates$maxDate)
+
 #write.table(locationDates, file="../data/Dec2016/cleaned/locations/locationDates.csv", sep=",", row.names=F)
 
+reportdate <- as.Date("2016-10-01")
+locations$minDate <- as.Date(locations$minDate)
+locations$maxDate <- as.Date(locations$maxDate)
 
-# first opened + length of time
-reportdate <- max(dispensing.sample$monthtime)
 locations <- locations %>%
-  dplyr::left_join(locationDates, by=c("location_id" = "location")) %>%
+  #dplyr::left_join(locationDates, by=c("location_id" = "location")) %>%
   dplyr::mutate(
     months_open = ifelse(status == "ACTIVE (ISSUED)",
                          ceiling(as.numeric(reportdate - minDate)/30),
@@ -351,8 +351,20 @@ locations <- locations %>%
                            ceiling(as.numeric(maxDate - minDate)/30),
                            NA
                          )))
-#write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv", row.names = F,
-#            col.names = T, sep=",")
+
+locations <- locations %>%
+  #dplyr::left_join(locationDates, by=c("location_id" = "location")) %>%
+  dplyr::mutate(
+    months_open = ifelse(status == "ACTIVE (ISSUED)",
+                         round((reportdate - minDate)/30, 0),
+                         ifelse(status=="CLOSED (PERMANENT)",
+                                round((maxDate - minDate)/30,0),
+                                NA))
+  )
+
+
+write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv", row.names = F,
+            col.names = T, sep=",")
 
 # 296 locations do not appear in the inventory file / do not have dates in the inventory file:
 review <- locations %>%
