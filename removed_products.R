@@ -10,7 +10,7 @@ locations <- readr::read_csv("../data/Dec2016/cleaned/locations/all_locations.cs
 loc.types <- readr::read_csv("../data/Dec2016/cleaned/locations/locationtypes.csv")
 loc.simp <- locations %>%
   left_join(loc.types, by=c("locationtype" = "loctypeCode")) %>%
-  select(typesimp, location_id, maxDate, months_open)
+  select(typesimp, location_id, maxDate, months_open, status)
 
 removereasons <- unique(inventory$removereason)
 write(removereasons, file="../data/Dec2016/cleaned/testing/removereasons.txt")
@@ -24,12 +24,8 @@ removedproduct <- inventory %>%
   mutate(marketsharerank = rank(allinv)/ length(allinv)) %>%
   filter(percremoved > 0) %>%
   arrange(desc(percremoved)) %>%
-  left_join(loc.simp, by=c("location" = "location_id")) %>%
-  # get status, if the month of the store's max date is less than
-  # the month of the overall max date (aka report month) then assume closed
-  mutate(status = ifelse(floor_date(maxDate, "month") < max(floor_date(locations$maxDate, "month"), na.rm=T),
-                         "Closed", "Open"))
-#write.table(removedproduct, file="../data/Dec2016/cleaned/samples/removed_product.csc", row.names=F, sep=",")
+  left_join(loc.simp, by=c("location" = "location_id"))
+write.table(removedproduct, file="../data/Dec2016/cleaned/samples/removed_product.csv", row.names=F, sep=",")
 
 removedproduct$status <- factor(removedproduct$status, levels = c("Open", "Closed"))
 
