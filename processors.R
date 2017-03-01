@@ -180,7 +180,10 @@ avg.sale.month %>%
   theme(legend.position=c(0.9,0.9), legend.justification = c(1,1)) +
   labs(title="Avg Sale and Producer Prices \nfor Top Types",
        x="Month",
-       y="Average Price")
+       y="Average Price") +
+  geom_line(size=1.5) +
+  facet_wrap("inv_type_name") +
+  theme(legend.position=c(0.9,0.9), legend.justification = c(1,1))
   
 ## line graph of sale price and producer price, over time
 ## for only useable, inhalation, edibles (solid)
@@ -200,7 +203,11 @@ avg.sale.month %>%
          # filtering it out
          retail_wholesale_ratio < 20) %>%
   ggplot(aes(x=month, y=retail_wholesale_ratio)) +
+<<<<<<< HEAD
   geom_line(color=cbPalette[4], size=1) +
+=======
+  geom_line(color=cbPalette[4]) +
+>>>>>>> 73ecf5b117dd650fcf57b5f21d601dcb6c74ddbe
   facet_wrap("inv_type_name") +
   theme(legend.position=c(0.9,0.9), legend.justification = c(1,1)) +
   labs(title="Avg Sale Price / Avg Processor Price",
