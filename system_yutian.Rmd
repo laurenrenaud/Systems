@@ -1,0 +1,515 @@
+---
+title: "System_Yutian"
+author: "Yutian Guo"
+date: "February 28, 2017"
+output: html_document
+---
+
+############ Library #################
+```{r setup, include=FALSE}
+library(ggplot2)
+library(MASS)
+library(caret)
+library(knitr)
+library(dplyr)
+library(plyr)
+library(data.table) 
+library(reshape2)
+library(lubridate) #date-time stuff
+library(splines)
+library(hexbin) #geom_hexbin
+library(broom)
+
+```
+
+############ Load Data ###############
+
+```{r,cache=TRUE}
+countstores_byday <- read.csv("countstores_byday.csv",header = TRUE)
+sales_bystore_byday <- read.csv("sales_bystore_byday.csv",header = TRUE)
+border_stores.csv <- read.csv("border_stores.csv",header = TRUE)
+pullman_all_stores<- border_stores.csv[which(border_stores.csv$location %in% getPullmanStores),]
+write.csv(file = 'pullman_all_stores', pullman_all_stores)
+
+```
+
+
+
+############ Modify Data ############### 
+
+Color Schema
+
+```{r }
+
+
+
+# The palette with black:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# To use for fills, add
+  scale_fill_manual(values=cbPalette)
+
+# To use for line and point colors, add
+  scale_colour_manual(values=cbPalette)
+
+```
+
+
+### Add Attributes ###
+
+```{r pressure, echo=FALSE}
+# Add column Year Month to it
+sales_bystore_byday$date <- as.Date(sales_bystore_byday$date)
+countstores_byday$date <- as.Date(countstores_byday$date)
+# Year
+countstores_byday$year<- as.numeric(format(countstores_byday$date,'%Y'))
+sales_bystore_byday$year <-as.numeric(format(sales_bystore_byday$date,'%Y'))
+# Month
+countstores_byday$month<- as.numeric(format(countstores_byday$date,'%m'))
+sales_bystore_byday$month <-as.numeric(format(sales_bystore_byday$date,'%m'))
+# Day
+countstores_byday$mday<- as.numeric(format(countstores_byday$date,'%d'))
+sales_bystore_byday$mday <-as.numeric(format(sales_bystore_byday$date,'%d'))
+
+# Weekdays
+
+countstores_byday$wday <- weekdays(countstores_byday$date)
+sales_bystore_byday$wday <- weekdays(sales_bystore_byday$date)
+
+# Make Location factor
+sales_bystore_byday$location <- as.factor(sales_bystore_byday$location)
+
+
+# Add adjust store open time 
+sales_bystore_byday<-sales_bystore_byday%>%
+  group_by(location)%>%
+  mutate(open_time = date-min(date))
+
+
+
+```
+
+
+
+
+### add holiday 2014 - 2016
+If holiday
+```{r }
+
+holiday <- rep(0, nrow(countstores_byday))
+#Martin Luther King Day
+holiday[which(countstores_byday$year ==2014 & countstores_byday$month == 1 & countstores_byday$mday == 20)] = 1
+holiday[which(countstores_byday$year ==2015 & countstores_byday$month == 1 & countstores_byday$mday == 19)] = 1
+holiday[which(countstores_byday$year ==2016 & countstores_byday$month == 1 & countstores_byday$mday == 18)] = 1
+#President Day
+holiday[which(countstores_byday$year ==2014 & countstores_byday$month == 2 & countstores_byday$mday == 17)] = 1
+holiday[which(countstores_byday$year ==2015 & countstores_byday$month == 2 & countstores_byday$mday == 16)] = 1
+holiday[which(countstores_byday$year ==2016 & countstores_byday$month == 2 & countstores_byday$mday == 15)] = 1
+# 4.20
+holiday[which(countstores_byday$month == 4 & (countstores_byday$mday == 20))] = 1
+#Memorial Day
+holiday[which(countstores_byday$year ==2014 &countstores_byday$month== 5 & countstores_byday$mday == 26)] = 1
+holiday[which(countstores_byday$year ==2015 & countstores_byday$month== 5 & countstores_byday$mday == 25)] = 1
+holiday[which(countstores_byday$year ==2016 & countstores_byday$month== 5 & countstores_byday$mday == 30)] = 1
+
+#Independence Day
+holiday[which(countstores_byday$month == 7 & countstores_byday$mday == 4)] = 1
+
+#Labor Day
+holiday[which(countstores_byday$year ==2014 & countstores_byday$month== 9 & countstores_byday$mday == 1)] = 1
+holiday[which(countstores_byday$year ==2015 & countstores_byday$month== 9 & countstores_byday$mday == 7)] = 1
+holiday[which(countstores_byday$year ==2016 & countstores_byday$month== 9 & countstores_byday$mday == 5)] = 1
+#Columbus Day
+holiday[which(countstores_byday$year ==2014 & countstores_byday$month== 10 & countstores_byday$mday == 13)] = 1
+holiday[which(countstores_byday$year ==2015 & countstores_byday$month== 10 & countstores_byday$mday == 12)] = 1
+holiday[which(countstores_byday$year ==2016 & countstores_byday$month== 10 & countstores_byday$mday == 10)] = 1
+# Veterance Day
+holiday[which(countstores_byday$month == 11 & (countstores_byday$mday == 10 | countstores_byday$mday == 11 | countstores_byday$mday== 12))] = 1
+#Thanksgiving
+holiday[which(countstores_byday$year ==2014 & countstores_byday$month== 11 & countstores_byday$mday == 27)] = 1
+holiday[which(countstores_byday$year ==2015 & countstores_byday$month== 11 & countstores_byday$mday == 26)] = 1
+holiday[which(countstores_byday$year ==2016 & countstores_byday$month== 11 & countstores_byday$mday == 24)] = 1
+#Christmas
+holiday[which(countstores_byday$month == 12 & countstores_byday$mday == 25)] = 1
+# Canadian 
+holiday[which(countstores_byday$month == 7 & (countstores_byday$mday == 1 ))] = 2
+
+countstores_byday = data.frame(countstores_byday, if.holiday = holiday)
+
+# add holiday to sales_bystore_byday
+sales_bystore_byday<-countstores_byday%>%
+  select(date,if.holiday)%>%
+  merge(sales_bystore_byday,by="date")
+
+```
+
+
+#### Make Avg Daily Data and Avg 2015 ###
+
+```{r}
+
+# AVG DAILY SALES
+
+Average_Daily_Sales<-sales_bystore_byday %>%
+  group_by(date)%>%
+  dplyr::summarise(Daily.transactions = sum(total_transactions),Daily.Revenue = sum(total_sales))%>%
+  merge(countstores_byday,by = 'date')%>%
+  mutate(avg.daily.transactions=Daily.transactions/num_stores,avg.daily.revenue=Daily.Revenue/num_stores)
+
+# AVG 2015
+AvgDailySale2015<-subset(Average_Daily_Sales, year == '2015')
+
+```
+
+
+### Deseason Avg Daily Data ###
+```{r}
+############ Avg Daily Data Deseasonality ##########
+
+# caculate weekly avg per day = weekTotal / days in week
+# caculate daily/weekavg
+AvgDailySale2015$week<-week(AvgDailySale2015$date)
+
+AvgDailySale2015_beta<-AvgDailySale2015%>%
+  group_by(week)%>%
+  dplyr::summarise(daysInWeek = n(),Week.TOTSales = sum(Daily.transactions),
+                   Week.TOTRevenue = sum(Daily.Revenue))%>%
+  mutate(weekly.avgSales = Week.TOTSales/daysInWeek,
+         weekly.avgRevenue =Week.TOTRevenue/daysInWeek)%>%
+  merge(AvgDailySale2015,by = "week")%>%
+  mutate(DailyTran.dividby.weekAvg= Daily.transactions/weekly.avgSales,
+         DailyRev.dividby.weekAvg = Daily.Revenue/weekly.avgRevenue)
+
+# caculate Sales.WeeklyRatio and Revenue.WeeklyRatio = (daily/weekavg)/#weeks in 2015
+AvgDailySale2015_seasonality<-AvgDailySale2015_beta%>%
+  group_by(wday)%>%
+  dplyr::summarise(Sales.WeeklyRatio = sum(DailyTran.dividby.weekAvg)/n(),
+                   Revenue.WeeklyRatio = sum(DailyRev.dividby.weekAvg)/n())
+# order seasonality 
+AvgDailySale2015_seasonality$wday <- factor(AvgDailySale2015_seasonality$wday , levels= c("Sunday", "Monday", 
+    "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+AvgDailySale2015_seasonality<-AvgDailySale2015_seasonality[order(AvgDailySale2015_seasonality$wday), ]
+
+# view seasonality indix
+kable(AvgDailySale2015_seasonality)
+
+# merge seasonality to beta version
+AvgDailySale2015_beta<-AvgDailySale2015_beta%>%
+  merge(AvgDailySale2015_seasonality,by = 'wday')%>%
+  arrange(date)
+
+# modify AvgDailySale2015; deseasonal data= daily.Rev / weeklyRatio for that weekday
+AvgDailySale2015<-AvgDailySale2015_beta%>%
+  select(date,year,month,mday,week,daysInWeek,wday,if.holiday,
+         Daily.transactions, Daily.Revenue,Sales.WeeklyRatio,Revenue.WeeklyRatio, num_stores,
+         perstore_dailytrans = avg.daily.transactions,perstore_dailyRev = avg.daily.revenue)%>%
+  mutate(adj.daily.revenue = Daily.Revenue/Revenue.WeeklyRatio,
+         adj.daily.trans =  Daily.transactions/Sales.WeeklyRatio,
+         perstore_adj.daily.rev = adj.daily.revenue/num_stores,
+         perstore_adj.daily.trans = adj.daily.trans/num_stores)
+
+# SALE 2015
+sales_bystore_byday2015<-subset(sales_bystore_byday, year == '2015')
+
+
+
+```
+
+
+### College Town Pullman ###
+
+```{r}
+########### PULLMAN ##########
+getPullmanStores<- c("457","910","1751","1761","1874")
+pullman2015<- sales_bystore_byday2015[which(sales_bystore_byday2015$location %in% getPullmanStores),]
+
+# aggregate on daily
+AvgDaily_pullman2015<-pullman2015 %>%
+  group_by(date)%>%
+  dplyr::summarise(Daily.transactions = sum(total_transactions),Daily.Revenue = sum(total_sales))%>%
+  merge(countstores_byday,by = 'date')%>%
+  mutate(perstore_dailytrans=Daily.transactions/num_stores,perstore_dailyRev=Daily.Revenue/num_stores)
+
+AvgDaily_pullman2015$week <- week(AvgDaily_pullman2015$date)
+
+
+# merge seasonality
+AvgDaily_pullman2015<-AvgDaily_pullman2015%>%
+  merge(AvgDailySale2015_seasonality,by = 'wday')%>%
+  arrange(date)
+# caculate de seasoned pullman sales & revenue
+AvgDaily_pullman2015<-AvgDaily_pullman2015%>%
+  mutate(adj.daily.revenue = Daily.Revenue/ Revenue.WeeklyRatio,
+         adj.daily.trans =  Daily.transactions/Sales.WeeklyRatio)
+
+# modify num of store in pullman in 2015
+AvgDaily_pullman2015$num_stores_PM<-rep(1,nrow(AvgDaily_pullman2015))
+AvgDaily_pullman2015[which(AvgDaily_pullman2015$date > '2015-06-26'),]$num_stores_PM=2
+# Add PM.perstore.adj.dailyTran and PM.perstore.adj.dailyRev
+AvgDaily_pullman2015$PM.perstore.adj.dailyTrans = AvgDaily_pullman2015$adj.daily.trans/AvgDaily_pullman2015$num_stores_PM
+AvgDaily_pullman2015$PM.perstore.adj.dailyRev = AvgDaily_pullman2015$adj.daily.revenue/AvgDaily_pullman2015$num_stores_PM
+
+# Combine 1751 and 457 : they are very close and have the same name
+pullman2015$location.2<-rep(0,nrow(pullman2015))
+pullman2015$location.2[which(pullman2015$location=='1761'|pullman2015$location=='457')]= '1761&457'
+pullman2015$location.2[which(pullman2015$location=='910')]= '910'
+pullman2015$location.2<-as.factor(pullman2015$location.2)
+
+
+```
+
+
+
+############ Descriptive Analysis ############### 
+
+### Plot trend of store numbers ###
+
+```{r }
+# Plot trend of store numbers (geom_point can be delete)
+ggplot(countstores_byday, aes(x = date, y = num_stores)) + 
+         geom_point() +
+         geom_smooth(color = "#009E73", method='loess') +
+         labs(x = 'Date', 
+              y = 'Number of Stores', 
+              title='Store Numbers since July 2014')+
+         guides(fill=guide_legend(title = 'Store Number'))
+
+# Growth Rate
+ # since it's close to a linear relationship:
+max.store<-max(countstores_byday$num_stores)
+min.store<-min(countstores_byday$num_stores)
+growth.rate =  (max.store-min.store)/min.store
+growth.rate
+
+```
+
+
+### Plot Avg daily trans ###
+
+```{r }
+# Plot Avg daily sales
+ggplot(Average_Daily_Sales,aes(x = date, y = avg.daily.transactions)) + 
+  geom_point(color ="#009E73") +
+         geom_smooth(color = "lightgreen", method='loess',size=2) +
+         labs(x = 'Date', 
+              y = 'Average Daily Sales Per Store', 
+              title='Average Daily Sales Per Store') +
+         guides(fill=guide_legend(title = 'Daily Sales'))
+
+# Outliers (on top)
+sales_bystore_byday %>%
+  group_by(date)%>%
+  dplyr::summarise(Daily.transactions = sum(total_transactions))%>%
+  merge(countstores_byday,by = 'date')%>%
+  mutate(avg.daily.transactions=Daily.transactions/num_stores)%>%
+  arrange(desc(avg.daily.transactions))%>%
+  head(5)
+
+```
+
+### Plot Avg daily trans on Day of Month ###
+```{r}
+# avg trans on each day of month with holiday colored
+ggplot(AvgDailySale2015, aes(x = mday,  y = Daily.transactions,
+                                fill = as.factor(if.holiday))) +
+  geom_bar(position = "dodge",stat = "identity")+
+  facet_wrap("month",ncol = 6)+ 
+  scale_fill_manual("if.holiday",values=cbPalette)+
+  labs(x = 'Month', y = 'Number of Transactions', 
+       title='Transactions by Day of Month with Holiday Colored')+
+  guides(fill=guide_legend(title = 'If Holiday', labels= c("Not Holiday","US Holiday", "Canadian Day")))
+
+```
+
+
+
+### Plot Avg daily trans on Day of Week ###
+```{r }
+# day of week
+
+Transactions_wday<-AvgDailySale2015%>%
+  group_by(wday)%>%
+  dplyr::summarise(wday_transactions = sum(perstore_dailytrans))%>%
+  arrange(desc(wday_transactions))
+
+Transactions_wday$wday <- as.factor(Transactions_wday$wday )
+levels(Transactions_wday$wday) = list("Sunday" = "Sunday","Saturday" = "Saturday","Friday" = "Friday" ,"Thursday" = "Thursday","Wednesday" = "Wednesday","Tuesday" = "Tuesday","Monday" = "Monday")
+
+ggplot(Transactions_wday, aes(x= wday, y  = wday_transactions)) + 
+  coord_flip() +
+  geom_bar(fill = "darkgreen",position = "dodge",stat = "identity")+ 
+  labs(x = 'Day of Week', y = 'Number of Transactions', title='Average Daily Transactions by Weekdays Year 2015')
+
+```
+
+
+
+### View Pullman Stores ###
+```{r }
+store457<-sales_bystore_byday%>%
+  subset(location == '457')%>%
+  dplyr::summarise(numOfdaysHaveSales = n(),
+                   FirstDay = min(date),
+                   LastDay = max(date))%>%
+  mutate(location= '457')%>%
+  select(location,FirstDay,LastDay,numOfdaysHaveSales)
+
+store910<-sales_bystore_byday%>%
+  subset(location == '910')%>%
+  dplyr::summarise(numOfdaysHaveSales = n(), 
+                   FirstDay = min(date),
+                   LastDay = max(date))%>%
+  mutate(location= '910')%>%
+  select(location,FirstDay,LastDay,numOfdaysHaveSales)
+  
+store1751<-sales_bystore_byday%>%
+  subset(location == '1751')%>%
+  dplyr::summarise(numOfdaysHaveSales = n(),
+                   FirstDay = min(date),
+                   LastDay = max(date))%>%
+  mutate(location= '1751')%>%
+  select(location,FirstDay,LastDay,numOfdaysHaveSales)
+
+store1761<-sales_bystore_byday%>%
+  subset(location == '1761')%>%
+  dplyr::summarise(numOfdaysHaveSales = n(),
+                   FirstDay = min(date),
+                   LastDay = max(date))%>%
+  mutate(location= '1761')%>%
+  select(location,FirstDay,LastDay,numOfdaysHaveSales)
+
+
+store1874<-sales_bystore_byday%>%
+  subset(location == '1874')%>%
+  dplyr::summarise(numOfdaysHaveSales = n(),
+                   FirstDay = min(date),
+                   LastDay = max(date))%>%
+  mutate(location= '1874')%>%
+  select(location,FirstDay,LastDay,numOfdaysHaveSales)
+
+Pullman.Stores<-rbind(store457,store1874,store1761,store1751,store910)%>%
+  arrange(FirstDay)
+  
+
+
+kable(Pullman.Stores)  
+
+```
+
+
+### View Pullman Store Market ###
+```{r}
+# absolute quantiti
+ggplot(pullman2015, aes(x = as.Date(date), y = total_sales, fill = location.2)) + geom_bar(stat = 'identity')+
+  labs(title="2015 sotre revenue in Pullman (stacked bar chart)",
+       x = "Date",
+       y = "Daily Revenue") 
+ 
+
+# add percentage
+pullman2015<-AvgDaily_pullman2015%>%
+  select(date,Daily.transactions,Daily.Revenue)%>%
+  merge(pullman2015)%>%
+  mutate(market.share.rev = total_sales/Daily.Revenue,
+         market.share.trans = total_transactions/Daily.transactions)
+
+ggplot(pullman2015, aes(x = as.Date(date), y = market.share.rev, fill = location.2)) + geom_bar(stat = 'identity')+
+  labs(title="2015 sotre revenue in Pullman (proportion)",
+       x = "Date",
+       y = "Daily Revenue Ratio")+scale_fill_manual(values=cbPalette)
+
+# that's why the revenue shakes so much because one store closed frequently during that period
+
+
+```
+
+
+
+***2015: Pullman store 1751_457 vs Avg Daily sales in WA***
+
+```{r}
+# transactions
+ggplot(AvgDaily_pullman2015,mapping = aes(x=as.Date(date),y=adj.daily.trans))+
+  geom_point(color = "#56B4E9") + 
+  geom_smooth(method='lm', formula = y~ns(x, df=10)£¬color ="#009E73" )+
+  labs(title="2015 Daily Sales in Pullman (All stores)") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-1-12')),linetype="dashed", size=1, colour="grey") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-16')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-20')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-8')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-11')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-1')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-24')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-12-18')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-6-27')),linetype="dashed", size=1, colour="red")+
+  geom_line(data=AvgDailySale2015,
+            mapping=(aes(x=as.Date(date),y=perstore_adj.daily.trans)),
+            group=1)
+
+
+# revenue
+ggplot(AvgDaily_pullman2015,mapping = aes(x=as.Date(date),y=adj.daily.revenue))+
+  geom_point(color = "#56B4E9") + 
+  geom_smooth(method='lm', formula = y~ns(x, df=10)£¬color ="#009E73" )+
+  labs(title="2015 Daily Revenue in Pullman (All stores)") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-1-12')),linetype="dashed", size=1, colour="grey") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-16')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-20')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-8')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-11')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-1')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-24')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-12-18')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-6-27')),linetype="dashed", size=1, colour="red")+
+  geom_line(data=AvgDailySale2015,
+            mapping=(aes(x=as.Date(date),y=perstore_adj.daily.rev)),
+            group=1)
+
+
+# PLOT PER STORE
+ggplot(AvgDaily_pullman2015,mapping = aes(x=as.Date(date),y=PM.perstore.adj.dailyTrans))+
+  geom_point(color = "#56B4E9") + 
+  geom_smooth(method='lm', formula = y~ns(x, df=10)£¬color ="#009E73" )+
+  labs(title="2015 Daily Sales in Pullman (Per stores)") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-1-12')),linetype="dashed", size=1, colour="grey") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-16')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-20')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-8')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-11')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-1')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-24')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-12-18')),linetype="dashed", size=1, colour="grey")+
+  geom_line(data=AvgDailySale2015,
+            mapping=(aes(x=as.Date(date),y=perstore_adj.daily.trans)),
+            group=1)
+
+
+# revenue
+ggplot(AvgDaily_pullman2015,mapping = aes(x=as.Date(date),y=PM.perstore.adj.dailyRev))+
+  geom_point(color = "#56B4E9") + 
+  geom_smooth(method='lm', formula = y~ns(x, df=10)£¬color ="#009E73" )+
+  labs(title="2015 Daily Revenue in Pullman (Per stores)") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-1-12')),linetype="dashed", size=1, colour="grey") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-16')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-20')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-8')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-11')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-1')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-24')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-12-18')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-6-23')),linetype="dashed", size=1, colour="red")+
+  geom_line(data=AvgDailySale2015,
+            mapping=(aes(x=as.Date(date),y=perstore_adj.daily.rev)),
+            group=1)
+
+
+
+ 
+
+  
+# find a way to add the date
+
+```
+
