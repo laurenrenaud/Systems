@@ -16,6 +16,8 @@ loc.simp <- locations %>%
 
 removereasons <- unique(inventory$removereason)
 write(removereasons, file="../data/Dec2016/cleaned/testing/removereasons.txt")
+removereasons_268 <- unique(inventory$removereason[inventory$location==268])
+write(removereasons, file="../data/Dec2016/cleaned/testing/removereasons_268.txt")
 
 # all entities, not filtered to remove zeros
 removedproduct <- inventory %>%
@@ -76,7 +78,7 @@ topremoved_types <- inventory %>%
   left_join(inv.type, by="inventorytype") %>%
   arrange(desc(removed_perc))
 
-# facet wrap
+# percent of removed for each product type
 inventory %>%
   group_by(inventorytype) %>%
   summarise(
@@ -88,6 +90,7 @@ inventory %>%
   ggplot(aes(x=reorder(inv_type_name, desc(removed_perc)), y=removed_perc)) +
   geom_bar(stat="identity", fill="darkgreen") +
   scale_y_continuous(labels = scales::percent) +
+  theme(axis.text.x = element_text(angle = 30, hjust = .9)) +
   labs(title="Precent of Removed Product",
        x="Inventory Type",
        y="Percent of Removed Product")
@@ -104,7 +107,8 @@ inventory %>%
   ggplot(aes(x=reorder(inv_type_name, desc(removed_perc)), y=removed_perc)) +
   geom_bar(stat="identity", fill="darkgreen") +
   scale_y_continuous(labels = scales::percent) +
-  labs(title="Precent of Removed Product",
+  theme(axis.text.x = element_text(angle = 30, hjust = .9)) +
+  labs(title="Precent of Removed Product excluding 'Waste'",
        x="Inventory Type",
        y="Percent of Removed Product")
 

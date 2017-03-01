@@ -1,6 +1,8 @@
 library(dplyr)
 library(readr)
 library(tidyr)
+library(lubridate)
+library(ggplot2)
 
 # set up ------------------
 # locatons
@@ -203,16 +205,100 @@ avg.sale.month %>%
          # filtering it out
          retail_wholesale_ratio < 20) %>%
   ggplot(aes(x=month, y=retail_wholesale_ratio)) +
-<<<<<<< HEAD
   geom_line(color=cbPalette[4], size=1) +
-=======
-  geom_line(color=cbPalette[4]) +
->>>>>>> 73ecf5b117dd650fcf57b5f21d601dcb6c74ddbe
   facet_wrap("inv_type_name") +
   theme(legend.position=c(0.9,0.9), legend.justification = c(1,1)) +
   labs(title="Avg Sale Price / Avg Processor Price",
        x="Month",
        y="Retail to Wholesale Ratio")
+
+
+# adding taxes -------------------------
+
+
+### including time
+avg.sale.month <- dispensing.select %>%
+  mutate(monthyear = floor_date(saletime, "month")) %>%
+  group_by(inventorytype, monthyear) %>%
+  summarise(avg_saleprice = median(price, na.rm=T)) %>%
+  # for some reason the join didn't work on the monthyear / date variable
+  # so I created a numeric variable for joining the dataframes
+  mutate(monthjoin = as.numeric(monthyear))
+
+avg.proc.month <- process.to.retail %>%
+  mutate(monthyear = floor_date(inv_date, "month")) %>%
+  group_by(trans_invtype, monthyear) %>%
+  summarise(avg_processorprice = median(trans_unitprice, na.rm=T)) %>%
+  # for some reason the join didn't work on the monthyear / date variable
+  # so I created a numeric variable for joining the dataframes
+  mutate(monthjoin = as.numeric(monthyear))
+
+## line graph of sale price and producer price, over time
+avg.sale.month %>%
+  left_join(avg.proc.month, by=c("monthjoin", "inventorytype" = "trans_invtype")) %>%
+  # needed to drop and rename some variables because of the weird join
+  select(inventorytype, month = monthyear.x, avg_saleprice, avg_processorprice) %>%
+  # gather so we get one value per row
+  tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  filter(!is.na(inventorytype), inv_type_name!="Capsule", inv_type_name!="Suppository",
+         inv_type_name!="Tincture") %>%
+  ggplot(aes(x=month, y=avg_price, color=supplystep)) +
+  geom_line() +
+  facet_wrap("inv_type_name") +
+  theme(legend.position=c(0.65,0.15))
+
+## line graph of sale price and producer price, over time
+## for only useable, inhalation, edibles (solid)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+avg.sale.month %>%
+  left_join(avg.proc.month, by=c("monthjoin", "inventorytype" = "trans_invtype")) %>%
+  # needed to drop and rename some variables because of the weird join
+  select(inventorytype, month = monthyear.x, avg_saleprice, avg_processorprice) %>%
+  # gather so we get one value per row
+  tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  filter(inv_type_name=="Usable Marijuana" | inv_type_name=="Marijuana Extract for Inhalation" |
+           inv_type_name=="Solid Marijuana Infused Edible") %>%
+  ggplot(aes(x=month, y=avg_price, color=supplystep)) +
+  scale_color_manual(values=c(cbPalette[2], cbPalette[3])) +
+  geom_line(size=1.5) +
+  facet_wrap("inv_type_name") +
+  theme(legend.position=c(0.9,0.9), legend.justification = c(1,1)) +
+  labs(title="Avg Sale and Producer Prices \nfor Top Types",
+       x="Month",
+       y="Average Price") +
+  geom_line(size=1.5) +
+  facet_wrap("inv_type_name") +
+  theme(legend.position=c(0.9,0.9), legend.justification = c(1,1))
+
+## line graph of sale price and producer price, over time
+## for only useable, inhalation, edibles (solid)
+## ratio of retail / wholesale
+avg.sale.month %>%
+  left_join(avg.proc.month, by=c("monthjoin", "inventorytype" = "trans_invtype")) %>%
+  # needed to drop and rename some variables because of the weird join
+  select(inventorytype, month = monthyear.x, avg_saleprice, avg_processorprice) %>%
+  # get ratio of retail / wholesale for each month
+  group_by(inventorytype, month) %>%
+  summarise(retail_wholesale_ratio = avg_saleprice / avg_processorprice) %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  filter(inv_type_name=="Usable Marijuana" | inv_type_name=="Marijuana Extract for Inhalation" |
+           inv_type_name=="Solid Marijuana Infused Edible",
+         # there was a spike that hit 24 but it seemed like an anomoly
+         # avg_saleprice = 63.860 while processorprice = 2.5993830
+         # filtering it out
+         retail_wholesale_ratio < 20) %>%
+  ggplot(aes(x=month, y=retail_wholesale_ratio)) +
+  geom_line(color=cbPalette[4], size=1) +
+  facet_wrap("inv_type_name") +
+  theme(legend.position=c(0.9,0.9), legend.justification = c(1,1)) +
+  labs(title="Avg Sale Price / Avg Processor Price",
+       x="Month",
+       y="Retail to Wholesale Ratio")
+
+
+
 
 # # connect to dispensing df
 # # dispensing
