@@ -118,7 +118,7 @@ dupe.disID <- retail.pullman %>%
 
 # now joining transfers to retail.pullman to get processor names attached to items
 retail.pullman <- retail.pullman %>%
-  filter(!dispensingid %in% selectingdupes$dispensingid) %>%
+  filter(!dispensingid %in% dupe.disID$dispensingid) %>%
   # the inventory id from the dispensing file matches the inventory id in the transfers file
   # maybe we don't even need to go through transfers?
   # checked that yes, trans_loc goes one for oen with processor_name
@@ -132,7 +132,7 @@ retail.pullman <- retail.pullman %>%
          process_productname = productname, processinv_date = inv_date, processor_invtype = inv_type_name.y,
          processor_invid = dis_parentid)
 
-write.table(retail.pullman, file="../data/Dec2016/cleaned/samples/pullman_retailAll.csv", row.names=F, sep=",")
+#write.table(retail.pullman, file="../data/Dec2016/cleaned/samples/pullman_retailAll.csv", row.names=F, sep=",")
 
 pullman.select <- retail.pullman %>%
   select(dispensingid, retail_loc, saleprice, saleuseweight, sale_invtype, sale_prodname, saleweight, saletime, transactionid,
@@ -245,3 +245,21 @@ selectingdupes <- test %>%
 
 # no duplicates in dispensing
 # no duplicate dispensingid in retail.pullman
+
+
+## checking Steve's undestanding of what 'inventory' is--------------
+## the entries appear to be increasing over time, which I
+## think means there's more product added, market it growing
+## not that old product is not included in inventory
+inventory %>%
+  ggplot(aes(x=inv_date)) +
+  geom_histogram()
+
+## also, when joining on inventory from dispensing for pullman
+## you don't lose a ton of entries (you lose the ones that are in the
+## duplicate transfer IDs but that's it I think)
+length(unique(retail.pullman$dispensingid))
+#[1] 474435
+
+length(unique(retail.pullman.checking$dispensingid))
+#[1] 465835
