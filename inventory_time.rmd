@@ -48,11 +48,12 @@ dispensing.select <- dispensing %>%
 
 retail.inventory <- dispensing.select %>%
   dplyr::left_join(inventory.select, by="inventoryid")
-retail.inventory$time_in_inv <- as.numeric(difftime(retail.inventory$saletime, retail.inventory$inv_date,
+retail.inventory$time_in_inv <- as.numeric(difftime(retail.inventory$saletime,
+                                                    retail.inventory$inv_date,
                                                     units = "days"))
 
 # % of negative numbers
-length(retail.inventory$time_in_inventory[retail.inventory$time_in_inventory < 0]) / nrow(retail.inventory)
+length(retail.inventory$time_in_inv[retail.inventory$time_in_inv < 0]) / nrow(retail.inventory)
 
 ```
 
@@ -66,6 +67,16 @@ retail.inventory %>%
   geom_histogram(fill="darkgreen") +
   labs(
     title="Time Spent in Stores' Inventory (All)",
+    x="Days in Inventory"
+  )
+
+# histogram of all types, filtered to <100 days
+retail.inventory %>%
+  filter(time_in_inv > 0, time_in_inv < 100) %>%
+  ggplot(aes(x=time_in_inv)) +
+  geom_histogram(fill="darkgreen") +
+  labs(
+    title="Time Spent in Stores' Inventory (<100 Days)",
     x="Days in Inventory"
   )
 
@@ -122,3 +133,76 @@ retail.inventory %>%
   
 ```
 
+```{r processors_invtime}
+# come back to this but look at what did wtih pullman
+
+
+# recreating retail df for Pullman ------
+retail.pullman <- dispensing %>%
+  dplyr::filter(location %in% c("457","910","1751","1761","1874")) %>%
+  dplyr::left_join(inventory, by="inventoryid") %>%
+  dplyr::select(dispensingid, location = location.x, price, usableweight = usableweight.x,
+                inv_type_name = inv_type_name.x, retail_invdate = inv_date,
+                strain, sale_prodname = productname, weight = weight.x, saletime = monthtime,
+                transactionid = transactionid.x, deleted = deleted.x, refunded, inventorytype = inventorytype.x,
+                dis_inventoryparentid = inventoryparentid, dis_invid = inventoryid, dis_parentid = parentid) %>%
+  left_join(locations.name.city, by=c("location" = "location_id"))
+
+retail.pullman$dis_parentid <- as.numeric(retail.pullman$dis_parentid)
+
+# trying to connect to transfers to get producers
+locations <- readr::read_csv("../data/Dec2016/cleaned/locations/all_locations.csv")
+loc.types <- readr::read_csv("../data/Dec2016/cleaned/locations/locationtypes.csv")
+loc.simp <- locations %>%
+  left_join(loc.types, by=c("locationtype" = "loctypeCode")) %>%
+  select(location_id, name, typesimp)
+
+transfers <- readr::read_csv("../data/Dec2016/biotrackthc_inventorytransfers.csv")
+transfers$inventoryid <- as.numeric(transfers$inventoryid)
+transfers$parentid <- as.numeric(transfers$parentid)
+transfers.select <- transfers %>%
+  select(transferid = id, inventoryid, trans_loc = location, 
+         trans_strain = strain, inventorytype, trans_parentid = parentid) %>%
+  left_join(inventory.types, by="inventorytype") %>%
+  select(-(inventorytype), trans_invtype = inv_type_name) %>%
+  left_join(loc.simp, by=c("trans_loc" = "location_id")) %>%
+  rename(processor_name = name)
+
+# interesting -- percent of transfers from each type
+transfers.select %>%
+  group_by(typesimp) %>%
+  summarise(perc = n() / nrow(transfers.select))
+
+# there were some (1.8%) of dispensing IDs that came up duplicate on this join
+# it appears they have multiple transferIDs that are causing the problem
+# need to look into it further, but dropping them for now
+dupe.disID <- retail.pullman %>%
+  left_join(transfers.select, by=c("dis_invid" = "inventoryid")) %>%
+  group_by(dispensingid) %>%
+  summarise(count = n()) %>%
+  filter(count > 1) %>%
+  arrange(desc(count))
+
+# now joining transfers to retail.pullman to get processor names attached to items
+retail.pullman <- retail.pullman %>%
+  filter(!dispensingid %in% selectingdupes$dispensingid) %>%
+  # the inventory id from the dispensing file matches the inventory id in the transfers file
+  # maybe we don't even need to go through transfers?
+  # checked that yes, trans_loc goes one for oen with processor_name
+  left_join(transfers.select, by=c("dis_invid" = "inventoryid")) %>%
+  # then the parent id from the dispening file matches the inventory id of the processor's inventory
+  left_join(inventory, by=c("dis_parentid" = "inventoryid")) %>%
+  select(dispensingid, retail_loc = location.x, saleprice = price, saleuseweight = usableweight.x, sale_invtype = inv_type_name.x,
+         sale_strain = strain.x, sale_prodname, saleweight = weight.x, saletime, retail_invdate, transactionid = transactionid.x,
+         refunded, dis_invid, retailname, trans_loc, trans_strain, trans_invtype, trans_parentid,
+         processor_name, processortype = typesimp, process_strain = strain.y, process_weight = weight.y, process_transctionid = transactionid.y,
+         process_productname = productname, processinv_date = inv_date, processor_invtype = inv_type_name.y,
+         processor_invid = dis_parentid)
+
+processor.invtime <- retail.pullman %>%
+  group_by(dispensingid) %>%
+  mutate(process_invtime = retail_invdate - processinv_date) %>%
+  select(dispensingid, retail_invdate, processinv_date, process_invtime)
+
+
+```
