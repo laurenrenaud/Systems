@@ -46,6 +46,11 @@ potency_tidy <- potency %>%
   dplyr::select(sample_id, CBD, THC, THCA, Total, test_inventorytype = inventorytype,
                 test_productname = product_name, inventoryid, inventoryparentid)
 
+
+##########################################################
+######## STOP HERE TO PREPARE INVENTORY & DISPENSING #####
+##########################################################
+
 library(ggplot2)
 potency_tidy %>%
   dplyr::filter(Total < 100) %>%
