@@ -1,0 +1,381 @@
+---
+title: "Sys Project"
+author: "Yilun Bao"
+date: 'January 19 2017'
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+#### **Data Preview & Preprocessing**
+
+```{r}
+# Import Retail Analysis dataset.
+# retail.pre <- read.csv("border_stores.csv", header=TRUE)
+# idaho <- read.csv("idaho_border.csv", header = TRUE)
+# oregon <- read.csv("oregon_border.csv", header = TRUE)
+
+# Import packages.
+library(plyr)
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+
+# Set the scientific notation.
+# options(scipen = 7)
+```
+  
+Split the dataset.
+
+```{r}
+# recreate the csv file.
+# idaho <- idaho[1:7, 1:11]
+# oregon <- oregon[1:13, 1:11]
+
+# get individual csv for each store.
+# 2 stores in Clarkston
+# i.810 <- retail.pre[which(retail.pre$location == 810),]
+# i.887 <- retail.pre[which(retail.pre$location == 887),]
+
+# 4 stores close to State University WA
+# pm.457 <- retail.pre[which(retail.pre$location == 457),]
+# pm.910 <- retail.pre[which(retail.pre$location == 910),]
+# pm.1751 <- retail.pre[which(retail.pre$location == 1751),]
+# pm.1761 <- retail.pre[which(retail.pre$location == 1761),]
+
+# 1 store in Pullman a bit far away from the campus
+# pm.1874 <- retail.pre[which(retail.pre$location == 1874),]
+```
+
+Clarkston
+
+```{r}
+# 810 exploration
+# CANNA4LIFE, Retailer & Medical
+i.810 <- read.csv("idaho_810.csv", header = TRUE)
+# Deal with the Date
+i.810$date <- substr(as.character(i.810$monthtime), 1, 10)
+# Calculate the number of transactions
+sum.tran.810 <- ddply(i.810, .(date), summarize, trans = length(name))
+sum.tran.810$date <- as.Date(sum.tran.810$date, format="%Y-%m-%d")
+
+# Plot the number of transactions
+ggplot(data = sum.tran.810, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "810 Number of Transactions \n (2015-05-22 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+```
+
+```{r}
+# 887 exploration
+# GREENFIELD COMPANY CANNABIS MERCANTILE, Retailer & Medical
+i.887 <- read.csv("idaho_887.csv", header = TRUE)
+# Deal with the Date
+i.887$date <- substr(as.character(i.887$monthtime), 1, 10)
+# Calculate the number of transactions
+sum.tran.887 <- ddply(i.887, .(date), summarize, trans = length(name))
+sum.tran.887$date <- as.Date(sum.tran.887$date, format="%Y-%m-%d")
+
+ggplot(data = sum.tran.887, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "887 Number of Transactions \n (2014-12-03 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+```
+
+Pullman
+
+```{r}
+# 457 exploration
+# MJ'S POT SHOP, Retailer & Medical
+pm.457 <- read.csv("pullman_457.csv", header = TRUE)
+# Deal with the Date
+pm.457$date <- substr(as.character(pm.457$monthtime), 1, 10)
+# Calculate the number of transactions
+sum.tran.457 <- ddply(pm.457, .(date), summarize, trans = length(name))
+sum.tran.457$date <- as.Date(sum.tran.457$date, format="%Y-%m-%d")
+
+
+ggplot(data = sum.tran.457, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "457 Number of Transactions \n (2014-11-04 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+# 1761 exploration
+# MJ'S POT SHOP, Retailer
+pm.1761 <- read.csv("pullman_1761.csv", header = TRUE)
+# Deal with the Date
+pm.1761$date <- substr(as.character(pm.1761$monthtime), 1, 10)
+# Calculate the number of transactions
+sum.tran.1761 <- ddply(pm.1761, .(date), summarize, trans = length(name))
+sum.tran.1761$date <- as.Date(sum.tran.1761$date, format="%Y-%m-%d")
+
+
+ggplot(data = sum.tran.1761, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "1761 Number of Transactions \n (2014-09-26 to 2015-04-24)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+```
+
+```{r}
+# Composite file for MJ's Shop
+sum_MJ <- rbind(sum.tran.457, sum.tran.1761)
+sum_MJ <- ddply(sum_MJ, .(date), summarize, trans = sum(trans))
+
+ggplot(data = sum_MJ, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "MJ'S POT SHOP Number of Transactions \n (2014-09-26 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+
+```{r}
+# 910 exploration
+# WE'RE JUST BUDS, Retailer & Medical
+pm.910 <- read.csv("pullman_910.csv", header = TRUE)
+# Deal with the Date
+pm.910$date <- substr(as.character(pm.910$monthtime), 1, 10)
+# Calculate the number of transactions
+sum.tran.910 <- ddply(pm.910, .(date), summarize, trans = length(name))
+sum.tran.910$date <- as.Date(sum.tran.910$date, format="%Y-%m-%d")
+
+
+ggplot(data = sum.tran.910, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "910 Number of Transactions \n (2015-03-09 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+# 1751 exploration
+# SATORI, Retailer & Medical
+pm.1751 <- read.csv("pullman_1751.csv", header = TRUE)
+# Deal with the Date
+pm.1751$date <- substr(as.character(pm.1751$monthtime), 1, 10)
+# Calculate the number of transactions
+sum.tran.1751 <- ddply(pm.1751, .(date), summarize, trans = length(name))
+sum.tran.1751$date <- as.Date(sum.tran.1751$date, format="%Y-%m-%d")
+
+
+ggplot(data = sum.tran.1751, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "1751 Number of Transactions \n (2015-11-23 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+```
+
+
+```{r}
+# Composite file for Pullman 4 stores
+sum_pm <- rbind(sum_MJ, sum.tran.910, sum.tran.1751)
+sum_pm <- ddply(sum_pm, .(date), summarize, trans = sum(trans))
+
+ggplot(data = sum_pm, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Pullman 4 Stores Number of Transactions \n (2014-09-26 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+
+
+
+```{r}
+# 1874 exploration
+# PABLO & CO., LLC, Retailer & Medical
+pm.1874 <- read.csv("pullman_1874.csv", header = TRUE)
+# Deal with the Date
+pm.1874$date <- substr(as.character(pm.1874$monthtime), 1, 10)
+# Calculate the number of transactions
+sum.tran.1874 <- ddply(pm.1874, .(date), summarize, trans = length(name))
+sum.tran.1874$date <- as.Date(sum.tran.1874$date, format="%Y-%m-%d")
+
+
+ggplot(data = sum.tran.1874, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "1874 Number of Transactions \n (2015-09-21 to 2016-10-29)") + theme(text = element_text(size = 7), axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1))
+```
+
+
+```{r}
+# Composite file for Pullman 5 stores
+sum_pm_all <- rbind(sum_pm, sum.tran.1874)
+sum_pm_all <- ddply(sum_pm_all, .(date), summarize, trans = sum(trans))
+
+ggplot(data = sum_pm_all, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Pullman 5 Stores Number of Transactions \n (2014-09-26 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+
+```{r}
+# Other 3 College Towns
+# Import the required files
+retailer <- read.csv("stores_by_totalsales.csv", header = TRUE)
+date.file <- read.csv("retail_times.csv", header = TRUE)
+
+# Merge the date columns onto retailer
+colnames(date.file)[1] <- "location"
+co.retailer <- merge(retailer, date.file, by = 'location', all.x = TRUE)
+co.retailer <- co.retailer[,c(1:11, 22:24)]
+
+# Import the transaction data.
+trans <- read.csv("sales_bystore_byday.csv")
+colnames(trans)[4] <- "trans"
+```
+
+
+
+```{r}
+library(dplyr)
+countstores_byday <- ddply(trans, "date", summarize, num_stores = length(location))
+Average_Daily_Sales<-trans %>%
+  group_by(date)%>%
+  dplyr::summarise(Daily.transactions = sum(trans),Daily.Revenue = sum(total_sales))%>%
+  merge(countstores_byday,by = 'date')%>%
+  mutate(avg.daily.transactions=Daily.transactions/num_stores,avg.daily.revenue=Daily.Revenue/num_stores)
+
+
+```
+
+
+Kittitas County
+Central Uni
+
+```{r}
+# Select the retailer info from the Retailer
+kitt <- co.retailer[which(co.retailer$location == 308|co.retailer$location == 981|co.retailer$location == 1637|co.retailer$location == 1813), ]
+```
+
+```{r}
+# 981
+# The Green Shelf, Retailer & Medical
+k.981 <- trans[which(trans$location == 981),]
+# Form the Date column
+k.981$date <- as.Date(k.981$date, format="%Y-%m-%d")
+
+ggplot(data = k.981, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores 981 Number of Transactions \n (2015-02-02 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggplot(k.981, mapping = aes(x = date, y = trans)) + geom_point(size = 2.5, color = "#56B4E9") + geom_smooth(method='lm', formula = y~ns(x, df=10),color ="#009E73" ) + labs(x ="Date", y = "Number of Transactions", title = "Kittitas Stores 981 Number of Transactions \n (2015-02-02 to 2016-10-31)") + geom_line(data=Average_Daily_Sales[50:848,], mapping=(aes(x=as.Date(date),y=avg.daily.transactions)), group=1)
+```
+
+```{r}
+# 1813
+# The Fire House, Retailer & Medical
+k.1813 <- trans[which(trans$location == 1813),]
+# Form the Date column
+k.1813$date <- as.Date(k.1813$date, format="%Y-%m-%d")
+
+ggplot(data = k.1813, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores 1813 Number of Transactions \n (2016-03-16 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+# 308
+# Cannabis Central, Retailer
+k.308 <- trans[which(trans$location == 308),]
+# Form the Date column
+k.308$date <- as.Date(k.308$date, format="%Y-%m-%d")
+
+ggplot(data = k.308, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores 308 Number of Transactions \n (2014-08-18 to 2016-04-07)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+# 1637
+# Cannabis Central, Retailer & Medical
+k.1637 <- trans[which(trans$location == 1637),]
+# Form the Date column
+k.1637$date <- as.Date(k.1637$date, format="%Y-%m-%d")
+
+ggplot(data = k.1637, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores 1637 Number of Transactions \n (2015-06-04 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+# Composite file for one store
+# Cannabis Central, Retailer & Medical
+cnb_ct <- rbind(k.308, k.1637)
+cnb_ct <- ddply(cnb_ct, .(date), summarize, trans = sum(trans))
+cnb_ct$date <- as.Date(cnb_ct$date, format="%Y-%m-%d")
+
+ggplot(data = cnb_ct, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores Cannabis Central Number of Transactions \n (2014-08-18 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggplot(cnb_ct, mapping = aes(x = date, y = trans)) + geom_point(size = 2.5, color = "#56B4E9") + ylim(0, 1000) + geom_smooth(method='lm', formula = y~ns(x, df=10),color ="#009E73" ) + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores Cannabis Central Number of Transactions \n (2014-08-18 to 2016-10-31)") + geom_line(data=Average_Daily_Sales[50:848,], mapping=(aes(x=as.Date(date),y=avg.daily.transactions)), group=1)
+```
+
+```{r}
+# Composite file for Kittitas
+sum_kitt <- rbind(k.981, k.1813, k.308, k.1637)
+sum_kitt <- ddply(sum_kitt, .(date), summarize, trans = sum(trans))
+sum_kitt$date <- as.Date(sum_kitt$date, format="%Y-%m-%d")
+
+ggplot(data = sum_kitt, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores: Number of Transactions \n (2014-08-18 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggplot(sum_kitt, mapping = aes(x = date, y = trans)) + geom_point(size = 2.5, color = "#56B4E9") + geom_smooth(method='lm', formula = y~ns(x, df=10),color ="#009E73" ) + labs( x ="Date", y = "Number of Transactions", title = "Kittitas Stores: Number of Transactions \n (2014-08-18 to 2016-10-31)") + geom_line(data=Average_Daily_Sales[50:848,], mapping=(aes(x=as.Date(date),y=avg.daily.transactions)), group=1)
+```
+
+
+
+ggplot(sum_kitt, mapping = aes(x = date, y = trans)) + geom_point(color = "#56B4E9") + geom_smooth(method='lm', formula = y~ns(x, df=10),color ="#009E73" ) + labs(title="Kittitas Stores: Number of Transactions \n (2014-08-18 to 2016-10-31)") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-1-12')),linetype="dashed", size=1, colour="grey") +
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-16')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-3-20')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-8')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-5-11')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-1')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-8-24')),linetype="dashed", size=1, colour="grey")+
+  geom_vline(xintercept= as.numeric(as.Date('2015-12-18')),linetype="dashed", size=1, colour="grey")+
+  geom_line(data=AvgDailySale2015,
+            mapping=(aes(x=as.Date(date),y=avg.daily.transactions)),
+            group=1)
+
+
+
+
+
+Walla Walla 
+Walla Walla Community
+WW University
+Whitman College
+
+```{r}
+# Select the retailer info from the Retailer
+walla <- co.retailer[which(co.retailer$location == 1101|co.retailer$location == 1144), ]
+```
+
+```{r}
+# 1101
+# Walla Walla Weedery, Retailer & Medical
+w.1101 <- trans[which(trans$location == 1101),]
+# Form the Date column
+w.1101$date <- as.Date(w.1101$date, format="%Y-%m-%d")
+
+ggplot(data = w.1101, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Walla Walla Stores 1101 Number of Transactions \n (2015-04-16 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggplot(w.1101, mapping = aes(x = date, y = trans)) + geom_point(size = 2.5, color = "#56B4E9") + geom_smooth(method='lm', formula = y~ns(x, df=10),color ="#009E73" ) + labs(x ="Date", y = "Number of Transactions", title = "Walla Walla Stores 1101 Number of Transactions \n (2015-04-16 to 2016-10-31)") + geom_line(data=Average_Daily_Sales[429:848,], mapping=(aes(x=as.Date(date),y=avg.daily.transactions)), group=1)
+```
+
+```{r}
+# 1144
+# Walla Walla Cannabis Company, Retailer & Medical
+w.1144 <- trans[which(trans$location == 1144),]
+# Form the Date column
+w.1144$date <- as.Date(w.1144$date, format="%Y-%m-%d")
+
+ggplot(data = w.1144, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Walla Walla Stores 1144 Number of Transactions \n (2014-12-14 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggplot(w.1144, mapping = aes(x = date, y = trans)) + geom_point(size = 2.5, color = "#56B4E9") + ylim(0, 2000) + geom_smooth(method='lm', formula = y~ns(x, df=10),color ="#009E73" ) + labs(x ="Date", y = "Number of Transactions", title = "Walla Walla Stores 1144 Number of Transactions \n (2014-12-14 to 2016-10-31)") + geom_line(data=Average_Daily_Sales[429:848,], mapping=(aes(x=as.Date(date),y=avg.daily.transactions)), group=1)
+```
+
+```{r}
+# Composite file for Walla Walla
+sum_walla <- rbind(w.1101, w.1144)
+sum_walla <- ddply(sum_walla, .(date), summarize, trans = sum(trans))
+sum_walla$date <- as.Date(sum_walla$date, format="%Y-%m-%d")
+
+ggplot(data = sum_walla, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Walla Walla Stores Number of Transactions \n (2014-12-14 to 2016-10-31)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+ggplot(sum_walla, mapping = aes(x = date, y = trans)) + geom_point(size = 2.5, color = "#56B4E9") + geom_smooth(method='lm', formula = y~ns(x, df=10),color ="#009E73" ) + labs(title="Walla Walla Stores: Number of Transactions \n (2014-12-14 to 2016-10-31)") + geom_line(data=Average_Daily_Sales[429:848,], mapping=(aes(x=as.Date(date),y=avg.daily.transactions)), group=1)
+```
+
+
+Benson
+Columbia Basin College
+956
+
+```{r}
+# Select the retailer info from the Retailer
+benson <- co.retailer[which(co.retailer$location == 956), ]
+```
+
+```{r}
+# 956
+# Lucky Leaf, Retailer
+b.956 <- trans[which(trans$location == 956),]
+# Form the Date column
+b.956$date <- as.Date(b.956$date, format="%Y-%m-%d")
+
+ggplot(data = b.956, mapping = aes(x = date, y = trans)) + geom_point() + labs( x ="Date", y = "Number of Transactions", title = "Benson Store 956 Number of Transactions \n (2015-03-11 to 2015-08-14)") + theme(text = element_text(size = 9), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+
+
+
+
+
