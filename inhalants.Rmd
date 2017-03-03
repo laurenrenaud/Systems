@@ -8,7 +8,7 @@ output:
     toc_depth: 4
 ---
 
-```{r setup, include=FALSE, cache=TRUE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 
 library(dplyr)
@@ -16,6 +16,9 @@ library(readr)
 library(knitr)
 library(tidyr)
 options(scipen = 4)
+```
+
+```{r setup2, include=FALSE, cache=TRUE}
 
 # pull in & clean dfs ------
 # locatons
@@ -58,9 +61,17 @@ dispens.select <- dispens.select %>%
 
 ```
 
+# Key findings
+
+ - Able to perform some form of **classification for about 60%** of the products for inhalation in the dispensing file.
+ - Including processors' inventory types in the process should get the number of **unclassified inhalants down to about 17%**.
+ - Need to review these preliminary categories from a domain standpoint, and to consider purposes of classification.
+ - May need stricter categorization for about 5% of products that match more than one keyword. 
+
+
 # Data cleaning and error checking
 
-I noticed a few oddities while working through the data.
+I noticed a few oddities while working through the data that are worth noting for future work and cleaning.
 
 First, there are three instances in the dispensing (aka retail) table where the location type is not a retailer. They all have negative sale prices, so I'm thinking someone coded refunds as going back to the Processor or Producer-Processor.
 
@@ -77,14 +88,14 @@ knitr::kable(nonretailers, col.names = c("dispensingid", "retail invid", "retail
 ```
 
 
-```{r combos1, echo=FALSE, warning=FALSE}
-
+```{r combos1, echo=FALSE}
+#library(dplyr)
 # testing that retail locations match retail inventory locations -------
 # building df that's only dispensing locations and inventory locations
 test.retaillocations <- dispens.select %>%
-  filter(loc_type=="Retailer") %>%
-  left_join(locations, by=c("retail_loc" = "location_id")) %>%
-  select(dis_loc = retail_loc, dis_name = name, dis_city = city, dis_loctype = loc_type.x, retail_invid,
+  dplyr::filter(loc_type=="Retailer") %>%
+  dplyr::left_join(locations, by=c("retail_loc" = "location_id")) %>%
+  dplyr::select(dis_loc = retail_loc, dis_name = name, dis_city = city, dis_loctype = loc_type.x, retail_invid,
          -(sale_price), -(saletime)) %>%
   dplyr::left_join(inv.select, by=c("retail_invid" = "inventoryid")) %>%
   dplyr::select(dis_loc, dis_name, dis_city, dis_loctype, retail_invid, inv_location) %>%
@@ -93,24 +104,24 @@ test.retaillocations <- dispens.select %>%
 # then for each retail location, getting how many inventory locations are associated with it
 # and percent of their entries for each
 test.combos <- test.retaillocations %>%
-  group_by(dis_loc) %>%
-  mutate(dis_count = n()) %>%
-  ungroup() %>%
-  group_by(dis_loc, inv_location) %>%
-  summarise(combocount = n(),
+  dplyr::group_by(dis_loc) %>%
+  dplyr::mutate(dis_count = n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(dis_loc, inv_location) %>%
+  dplyr::summarise(combocount = n(),
             comboperc = n() / dis_count[1]*100,
             dis_city = dis_city[1],
             inv_city = city[1],
             inv_loctype = loc_type[1]) %>%
-  arrange(dis_loc, comboperc)
+  dplyr::arrange(dis_loc, comboperc)
 #hist(test.combos$comboperc)
 #sum(test.combos$combocount[test.combos$combocount < 98]) / nrow(test.retaillocations)
 
 avg.combos <- test.combos %>%
-  group_by(dis_loc) %>%
-  summarise(count=n()) %>%
-  ungroup() %>%
-  summarise(avg.combos = mean(count, na.rm=T))
+  dplyr::group_by(dis_loc) %>%
+  dplyr::summarise(count=n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::summarise(avg.combos = mean(count, na.rm=T))
 ```
 
 I also noticed that in `r round(sum(test.combos$combocount[test.combos$combocount < 97]) / nrow(test.retaillocations)*100,1)`% of dispensing rows, when you link back to the inventory file, the inventory location does not match the retailer's location.
@@ -161,7 +172,7 @@ inhalants.joined <- dispens.select %>%
 
 Lastly, `productname` is missing for `r round(sum(is.na(inhalants.joined$retail_prodname)) / nrow(inhalants.joined)*100,1)`% of inhalants. This is compared to an estimated 6% of retail products of all types that are missing product names.
 
-```{r prelimClass, echo=FALSE, warning=FALSE}
+```{r prelimClass, echo=FALSE, warning=FALSE, cache=TRUE}
 
 # first get list/df of inhalantnames
 inhalantnames <- as.data.frame(unique(inhalants.joined$retail_prodname))
@@ -192,8 +203,8 @@ prelimCat <- inhalants %>%
   dplyr::select(dispensingid, cartidge:uncategorized) %>%
   tidyr::gather(keyword, status, cartidge:uncategorized) %>%
   dplyr::group_by(keyword) %>%
-  dplyr::summarise(count = sum(status==TRUE),
-                   perc = round(count / nrow(inhalants)*100,1)) %>%
+  dplyr::summarise(perc = round(sum(status==TRUE) / nrow(inhalants)*100,1),
+                   count = sum(status==TRUE)) %>%
   dplyr::arrange(desc(perc))
 
 # trying to get count of how many products hit more than category
@@ -217,7 +228,8 @@ Our first pass at categorizing inhalants is by searching product names for what 
 This table shows how many products fit each classification. These do no sum to 100% because `r round(sum(num.keywords$distro_numkeywords[num.keywords$numCat>1]) / nrow(inhalantnames)*100,1)`% product names contain more than one string.
 
 ```{r prelimcat_table, echo=FALSE, warning=FALSE}
-knitr::kable(prelimCat, col.names = c("Keyword", "Count", "Percent"))
+knitr::kable(prelimCat, col.names = c("Keyword", "Percent", "Count"),
+               align=c("r", "r", "r"))
 ```
 
 In a cursory look at the product names, it looked like things that are categorized as cartridges might be picking up other keywords too. This table looks only at things that are cartridges, and then what other, additional keywords they also pick up, as well as their pecent of all inhalants in the market, and percentage of cartridges in the market.
@@ -230,11 +242,12 @@ inhalants %>%
   dplyr::select(cart_count, dispensingid, BHO:uncategorized) %>%
   tidyr::gather(keyword, status, BHO:uncategorized) %>%
   dplyr::group_by(keyword) %>%
-  dplyr::summarise(count = sum(status==TRUE),
-                   perc.inhalants = round(count / nrow(inhalants)*100,2),
-                   perc.cart = round(count / cart_count[1] * 100,2)) %>%
+  dplyr::summarise(perc.inhalants = round(sum(status==TRUE) / nrow(inhalants)*100,2),
+                   perc.cart = round(sum(status==TRUE) / cart_count[1] * 100,2),
+                   count = sum(status==TRUE)) %>%
   dplyr::arrange(desc(perc.cart)) %>%
-  kable(col.names = c("Keyword", "Count", "% of Inhalants", "% of Cartidges"))
+  knitr::kable(col.names = c("Keyword", "% of Inhalants", "% of Cartidges", "Count"),
+               align=c("r", "r", "r", "r"))
 
 ```
 
@@ -249,19 +262,22 @@ For about half of the inhalants, the processor also listed the product type as "
 process.types <- inhalants %>%
   filter(!is.na(retail_invtype)) %>%
   group_by(process_invtype) %>%
-  summarise(count = n(),
-            perc = round(count / nrow(inhalants.joined)*100,1)) %>%
+  summarise(perc = round( n() / nrow(inhalants.joined)*100,1),
+            count = n()) %>%
   arrange(desc(count))
 
-knitr::kable(process.types, col.names = c("Processor's Inventory Type - All Inhalants", "Count", "Percent of Inhalants"))
+knitr::kable(process.types, col.names = c("Processor's Inventory Type - All Inhalants",
+                                          "Percent of Inhalants",
+                                          "Count"),
+               align=c("r", "r", "r"))
 
 
 process.types.uncategorized <- inhalants %>%
   filter(!is.na(retail_invtype), !is.na(process_invtype), uncategorized) %>%
   mutate(total = n()) %>%
   group_by(process_invtype) %>%
-  summarise(count = n(),
-            perc = round(count / total[1] *100,1)) %>%
+  summarise(perc = round(n() / total[1] *100,1),
+            count = n()) %>%
   arrange(desc(count))
 
 ```
@@ -271,8 +287,9 @@ More excitingly, we should be able to classify an additional `r round(sum(proces
 ```{r processortypes2, echo=FALSE, warning=FALSE}
 
 knitr::kable(process.types.uncategorized, col.names = c("Processor's Inventory Type - Cartridge Only",
-                                                        "Count",
-                                                        "Percent of Uncategorized"))
+                                                        "Percent of Uncategorized",
+                                                        "Count"),
+             align=c("r", "r", "r"))
 
 # process.types.uncategorized2 <- inhalants %>%
 #   filter(!is.na(retail_invtype), !is.na(process_invtype), process_invtype!="Marijuana Extract for Inhalation") %>%
@@ -292,7 +309,7 @@ knitr::kable(process.types.uncategorized, col.names = c("Processor's Inventory T
  - Scatterplot of existing categories, possible cluster model, which may also help classify the uncategorized
 
 
-```{r other}
+```{r other, echo=FALSE, warning=FALSE}
 # 
 # # labs -------
 # potency <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_potency_analysis.csv")

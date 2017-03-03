@@ -46,6 +46,18 @@ potency_tidy <- potency %>%
   dplyr::select(sample_id, CBD, THC, THCA, Total, test_inventorytype = inventorytype,
                 test_productname = product_name, inventoryid, inventoryparentid)
 
+library(ggplot2)
+potency_tidy %>%
+  dplyr::filter(Total < 100) %>%
+  ggplot(aes(x=Total)) +
+  geom_density(fill="olivedrab")
+
+hist(potency_tidy$Total[potency_tidy$Total<100])
+hist(potency_tidy$Total[potency_tidy$Total<20])
+hist(potency_tidy$Total[potency_tidy$Total<5])
+sum(potency_tidy$Total==0, na.rm=T) / nrow(potency_tidy)
+sum(is.na(potency_tidy$test_productname)) / nrow(potency_tidy)
+
 # recreating Steve's retail df ------
 retail <- dispensing %>%
   dplyr::left_join(inventory.retail, by="inventoryid") %>%
@@ -86,6 +98,9 @@ retail.pullman$dis_parentid <- as.numeric(retail.pullman$dis_parentid)
 # trying to connect to transfers to get producers
 locations <- readr::read_csv("../data/Dec2016/cleaned/locations/all_locations.csv")
 loc.types <- readr::read_csv("../data/Dec2016/cleaned/locations/locationtypes.csv")
+locations <- left_join(locations, loc.types, by=c("locationtype" = "loctypeCode"))
+#write.table(locations, file="../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", row.names=F)
+
 loc.simp <- locations %>%
   left_join(loc.types, by=c("locationtype" = "loctypeCode")) %>%
   select(location_id, name, typesimp)
@@ -100,6 +115,7 @@ transfers.select <- transfers %>%
   select(-(inventorytype), trans_invtype = inv_type_name) %>%
   left_join(loc.simp, by=c("trans_loc" = "location_id")) %>%
   rename(processor_name = name)
+
 
 # interesting -- percent of transfers from each type
 transfers.select %>%
