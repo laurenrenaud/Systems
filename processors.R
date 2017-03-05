@@ -93,11 +93,15 @@ proc.retail.clean <- process.to.retail %>%
 ## wholesale and retail prices -------------
 ## cleaning dispensing for comparing
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
-dispensing.select <- select(dispensing, dispensingid = id, weight, saletime = sessiontime, 
+dispensing.select <- dplyr::select(dispensing, dispensingid = id, weight, saletime = sessiontime, 
                             price, inventorytype, location)
-dispensing.select$saletime <- as.POSIXct(dispensing.select$saletime,
-                                  origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-dispensing.select$saletime <- as.Date(dispensing.select$saletime)
+dispensing.select$saletime <- as.Date(as.POSIXct(dispensing.select$saletime,
+                                                 origin = "1970-01-01", tz="America/Los_Angeles"))
+
+# editing for post July tax change
+dispensing.select$price_x <- ifelse(dispensing.select$saletime >= "2015-07-01", 
+                                    dispensing.select$price*1.37, 
+                                    dispensing.select$price)
 
 # overall comparision, without time
 avg.saleprice <- dispensing.select %>%
