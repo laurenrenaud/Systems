@@ -9,18 +9,20 @@ retail.loc <- filter(locations, retail==1)
 # inventory
 inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
-inventory$sessiontime <- as.POSIXct(inventory$sessiontime,
-                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-inventory$inv_date <- as.Date(inventory$sessiontime)
+inventory$inv_date <- as.Date(as.POSIXct(inventory$sessiontime,
+                                            origin = "1970-01-01", tz="America/Los_Angeles"))
 inventory <- rename(inventory, inventoryid = id)
 inventory <- left_join(inventory, inventory.types, by="inventorytype")
 inventory$sample_id <- as.numeric(inventory$sample_id)
 inventory.retail <- filter(inventory, location %in% retail.loc$location_id)
 # dispensing
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
-dispensing$monthtime <- as.POSIXct(dispensing$sessiontime,
-                                   origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
-dispensing$monthtime <- as.Date(dispensing$monthtime)
+dispensing$monthtime <- as.Date(as.POSIXct(dispensing$sessiontime,
+                                           origin = "1970-01-01", tz="America/Los_Angeles"))
+# editing for post July tax change
+dispensing$price_x <- ifelse(dispensing$monthtime >= "2015-07-01", 
+                             dispensing$price*1.37, 
+                             dispensing$price)
 dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
 dispensing$inv_type_name <- as.factor(dispensing$inv_type_name)
 dispensing <- rename(dispensing, dispensingid = id)
@@ -51,23 +53,12 @@ potency_tidy <- potency %>%
 ######## STOP HERE TO PREPARE INVENTORY & DISPENSING #####
 ##########################################################
 
-library(ggplot2)
-potency_tidy %>%
-  dplyr::filter(Total < 100) %>%
-  ggplot(aes(x=Total)) +
-  geom_density(fill="olivedrab")
-
-hist(potency_tidy$Total[potency_tidy$Total<100])
-hist(potency_tidy$Total[potency_tidy$Total<20])
-hist(potency_tidy$Total[potency_tidy$Total<5])
-sum(potency_tidy$Total==0, na.rm=T) / nrow(potency_tidy)
-sum(is.na(potency_tidy$test_productname)) / nrow(potency_tidy)
 
 # recreating Steve's retail df ------
 retail <- dispensing %>%
-  dplyr::left_join(inventory.retail, by="inventoryid") %>%
+  dplyr::left_join(inventory, by="inventoryid") %>%
   dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
-  dplyr::select(dispensingid, location = location.x, price, usableweight = usableweight.x,
+  dplyr::select(dispensingid, location = location.x, price, price_x, usableweight = usableweight.x,
                 inv_type_name = inv_type_name.x, inventoryid = inventoryid.x,
                 strain, productname, CBD, THC, THCA, Total, weight = weight.x, saletime = monthtime,
                 transactionid = transactionid.x, deleted = deleted.x, refunded, inventorytype = inventorytype.x,
@@ -77,15 +68,61 @@ retail <- dispensing %>%
 # sample -----
 retail.list <- sample(retail$dispensingid, 20000, replace=F)
 retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
-write.table(retail.sample, file="../data/Dec2016/cleaned/samples/retail_sample.csv", sep=",", row.names = F, col.names = T)
+#write.table(retail.sample, file="../data/Dec2016/cleaned/samples/retail_sample.csv", sep=",", row.names = F, col.names = T)
+#write.table(retail, file="../data/Dec2016/cleaned/retail_detail.csv", sep=",", row.names = F, col.names = T)
 #lm(formula = price ~ usableweight + inv_type_name + CBD + THC + Total, data=retail)
 
-#write.table(retail, file="../data/Dec2016/cleaned/retail_detail.csv", sep=",", row.names = F, col.names = T)
+# inhalants
+inhalants <- dplyr::filter(retail, inv_type_name=="Marijuana Extract for Inhalation")
+write.table(inhalants, file="../data/Dec2016/cleaned/samples/inahlants.csv", sep=",", row.names = F, col.names = T)
+
 
 ########################################################
 ######## STOP HERE TO GENERATE RETAIL SET + SAMPLE #####
 ########################################################
 
+# Connect to dispensing to inventory to producers inventory
+locations <- readr::read_csv("../data/Dec2016/cleaned/locations/all_locations.csv")
+loc.simp <- select(locations, location_id, name, typesimp)
+inventory$parentid <-as.numeric(inventory$parentid)
+
+retail <- dispensing %>%
+  # first going back to retailer's inventory
+  dplyr::left_join(inventory, by="inventoryid") %>%
+  # then getting potency
+  dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
+  # renaming and dropping variables
+  dplyr::select(dispensingid, retail_loc = location.x, price, price_x, usableweight = usableweight.x,
+                inv_type_name = inv_type_name.x, inventoryid = inventoryid.x, parentid,
+                strain, productname, CBD, THC, THCA, Total, weight = weight.x, saledate = monthtime,
+                transactionid = transactionid.x, deleted = deleted.x, refunded, inventorytype = inventorytype.x,
+                inventoryparentid, retail_invdate = inv_date) %>%
+  # details on retailer's location
+  dplyr::left_join(loc.simp, by=c("retail_loc" = "location_id")) %>%
+  dplyr::rename(retail_name = name, retail_parentid = parentid) %>%
+  dplyr::select(-(typesimp)) %>%
+  # then connecting from retailer's inventory to processors parentid
+  dplyr::left_join(inventory, by=c("retail_parentid" = "inventoryid")) %>%
+  # renaming and dropping variables
+  dplyr::select(dispensingid, retail_loc, price, price_x, usableweight = usableweight.x,
+                retail_invtypename = inv_type_name.x, inventoryid, retail_parentid, retail_invdate,
+                strain = strain.x, productname = productname.x, CBD, THC, THCA, Total, 
+                weight = weight.x, saledate, transactionid = transactionid.x, deleted = deleted.x, refunded, 
+                retail_invtype = inventorytype.x, inventoryparentid = inventoryparentid.x, retail_name,
+                process_loc = location, prococss_invtype = inventorytype.y, process_invdate = inv_date,
+                process_invtypename = inv_type_name.y)
+  
+# testing time differences
+retail.list <- sample(retail$dispensingid, 20000, replace=F)
+retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
+retail.sample$process_timeininv <- retail.sample$retail_invdate - retail.sample$process_invdate
+retail.sample$retail_timeininv <- retail.sample$saletime - retail.sample$retail_invdate
+test <- retail.sample %>%
+  select(dispensingid, saletime, retai_invdate, process_invdate, stepback_time, retail_timeininv)
+
+########################################################
+######## After this, Pullman sample ####################
+########################################################
 
 # recreating retail df for Pullman ------
 retail.pullman <- dispensing %>%
@@ -159,7 +196,7 @@ pullman.select <- retail.pullman %>%
   select(dispensingid, retail_loc, saleprice, saleuseweight, sale_invtype, sale_prodname, saleweight, saletime, transactionid,
          refunded, retailname, processor_name, processortype, process_productname, processinv_date, processor_invtype)
 
-write.table(pullman.select, file="../data/Dec2016/cleaned/samples/pullman_retailSelectVariables.csv", row.names=F, sep=",")
+#write.table(pullman.select, file="../data/Dec2016/cleaned/samples/pullman_retailSelectVariables.csv", row.names=F, sep=",")
 
 
 

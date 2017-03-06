@@ -93,15 +93,35 @@ proc.retail.clean <- process.to.retail %>%
 ## wholesale and retail prices -------------
 ## cleaning dispensing for comparing
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
+dispensing$saletime <- as.Date(as.POSIXct(dispensing$sessiontime,
+                                                 origin = "1970-01-01", tz="America/Los_Angeles"))
+# editing for post July tax change
+dispensing$price_x <- ifelse(dispensing$saletime >= "2015-07-01", 
+                             dispensing$price*1.37, 
+                             dispensing$price)
+
+
+# now joining transfers to retail.pullman to get processor names attached to items
+retail.test <- dispensing %>%
+  # then the parent id from the dispening file matches the inventory id of the processor's inventory
+  left_join(inventory, by=c("dis_parentid" = "inventoryid")) %>%
+  select(dispensingid, retail_loc = location.x, saleprice = price, saleuseweight = usableweight.x, sale_invtype = inv_type_name.x,
+         sale_strain = strain.x, sale_prodname, saleweight = weight.x, saletime, retail_invdate, transactionid = transactionid.x,
+         refunded, dis_invid, retailname, trans_loc, trans_strain, trans_invtype, trans_parentid,
+         processor_name, processortype = typesimp, process_strain = strain.y, process_weight = weight.y, process_transctionid = transactionid.y,
+         process_productname = productname, processinv_date = inv_date, processor_invtype = inv_type_name.y,
+         processor_invid = dis_parentid)
+
+
+
 dispensing.select <- dplyr::select(dispensing, dispensingid = id, weight, saletime = sessiontime, 
                             price, inventorytype, location)
-dispensing.select$saletime <- as.Date(as.POSIXct(dispensing.select$saletime,
-                                                 origin = "1970-01-01", tz="America/Los_Angeles"))
 
-# editing for post July tax change
-dispensing.select$price_x <- ifelse(dispensing.select$saletime >= "2015-07-01", 
-                                    dispensing.select$price*1.37, 
-                                    dispensing.select$price)
+
+
+
+
+
 
 # overall comparision, without time
 avg.saleprice <- dispensing.select %>%
