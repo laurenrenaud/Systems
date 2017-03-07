@@ -125,29 +125,34 @@ $(document).ready(function () {
 <div id="TOC">
 <ul>
 <li><a href="#key-findings">Key findings</a></li>
-<li><a href="#initial-classification">Initial classification</a><ul>
+<li><a href="#initial-classification-keyword-search">Initial classification: Keyword Search</a><ul>
 <li><a href="#overlap-cartridges">Overlap: Cartridges</a></li>
 <li><a href="#overlap-oil">Overlap: Oil</a></li>
 </ul></li>
 <li><a href="#processor-types">Processor Types</a></li>
 <li><a href="#next-steps">Next Steps</a></li>
-<li><a href="#data-cleaning-and-error-checking">Data cleaning and error checking</a></li>
+<li><a href="#data-cleaning-and-error-checking">Data cleaning and error checking</a><ul>
+<li><a href="#non-retailers-in-dispensing-file">Non-retailers in dispensing file</a></li>
+<li><a href="#retailer-products-connected-to-others-inventories">Retailer products connected to other’s inventories</a></li>
+<li><a href="#missing-product-names">Missing product names</a></li>
+</ul></li>
 </ul>
 </div>
 
 <div id="key-findings" class="section level1">
 <h1>Key findings</h1>
 <ul>
-<li>Able to perform some form of <strong>classification for about 64%</strong> of the products for inhalation in the dispensing file.</li>
+<li>Able to perform some form of <strong>classification for about 64%</strong> of the products for inhalation in the dispensing file (counted by number of items sold in the dispensing file).</li>
 <li>Including processors’ inventory types in the process should get the number of <strong>unclassified inhalants down to about 16%</strong>.</li>
 <li>Need to review these preliminary categories from a domain standpoint, and to consider purposes of classification.</li>
-<li>May need stricter categorization for about 7% of products that match more than one keyword.</li>
+<li>May need stricter categorization for about 7% of products sold that match more than one keyword.</li>
 </ul>
 </div>
-<div id="initial-classification" class="section level1">
-<h1>Initial classification</h1>
-<p>Our first pass at categorizing inhalants is by searching product names for what would indicate product types. This method is able to classify 64.4% of the products for inhalation in the dispensing file, which is 66.1% of inhalant product names.</p>
-<p>This table shows how many products fit each classification as well as the strings used for classificiation. (For “hash”, it also picks up “hashish”, but hashish was not searched for separately.) These do not sum to 100% because 7% of product names contain more than one string.</p>
+<div id="initial-classification-keyword-search" class="section level1">
+<h1>Initial classification: Keyword Search</h1>
+<p>Our first pass at categorizing inhalants is by searching product names for what would indicate product types. This method is able to classify 64.4% of “Marijuana Extract for Inhalation” products that were sold in the dispensing file, which is 66.1% of inhalant product names.</p>
+<p>This table shows how many products fit each classification as well as the strings used for classificiation. (For “hash”, it also picks up “hashish”, but hashish was not searched for separately.) These do not sum to 100% because 7% of product names contain more than one string. <code>Count</code> here is counting number of products appearing in the dispensing (retail) file, not a count of product names.</p>
+<p>While we could do a more thorough analysis of all the overlapping keywords, for this preliminary pass below we can look at “cartridges” and “oil” to see what the overlap for these keywords look like.</p>
 <table>
 <thead>
 <tr class="header">
@@ -226,11 +231,10 @@ $(document).ready(function () {
 </tr>
 </tbody>
 </table>
-<p>While we could do a more thorough analysis of all the overlapping keywords, we can first look at “cartridges” and “oil” first to see what these look like.</p>
 <div id="overlap-cartridges" class="section level3">
 <h3>Overlap: Cartridges</h3>
 <p>In a cursory look at the product names, it looked like things that are categorized as “cartridges” might be picking up other keywords too. This table looks only at things that are cartridges, and then what other, additional keywords they also pick up, as well as their pecent of all inhalants in the market, and percentage of cartridges in the market.</p>
-<p>Overall 8.22% of cartidges are picking up other keywords, with the highest being butane hash oil at 7.1% of the cartridges. We will have to consider whether to categorize as “cartridge” first, or as BHO, or as something like “BHO cartridge”, and similarly but less pressing with other subcategories of cartridges.</p>
+<p>Overall 20.25% of cartidges are picking up other keywords, with the highest being “oil” at 12.03% followed by “BHO” at 7.1% of the cartridges. We will have to consider whether to categorize as “cartridge” first, or as oil or BHO, or as something like “BHO cartridge” as compared to “General cartridge”, for example. Similarly we need to make the same judgements with other subcategories of cartridges, though there are fewer products in the market with these other combinations of keywords.</p>
 <table>
 <thead>
 <tr class="header">
@@ -242,66 +246,66 @@ $(document).ready(function () {
 </thead>
 <tbody>
 <tr class="odd">
+<td align="right">oil</td>
+<td align="right">3.22</td>
+<td align="right">12.03</td>
+<td align="right">198875</td>
+</tr>
+<tr class="even">
 <td align="right">BHO</td>
 <td align="right">1.90</td>
 <td align="right">7.10</td>
 <td align="right">117433</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="right">hash</td>
 <td align="right">0.12</td>
 <td align="right">0.45</td>
 <td align="right">7421</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="right">dab</td>
 <td align="right">0.06</td>
 <td align="right">0.24</td>
 <td align="right">3934</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="right">bubble</td>
 <td align="right">0.05</td>
 <td align="right">0.19</td>
 <td align="right">3080</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="right">wax</td>
 <td align="right">0.03</td>
 <td align="right">0.11</td>
 <td align="right">1751</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="right">kief</td>
 <td align="right">0.01</td>
 <td align="right">0.06</td>
 <td align="right">922</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="right">shatter</td>
 <td align="right">0.01</td>
 <td align="right">0.04</td>
 <td align="right">588</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="right">resin</td>
 <td align="right">0.01</td>
 <td align="right">0.03</td>
 <td align="right">549</td>
-</tr>
-<tr class="odd">
-<td align="right">uncategorized</td>
-<td align="right">0.00</td>
-<td align="right">0.00</td>
-<td align="right">0</td>
 </tr>
 </tbody>
 </table>
 </div>
 <div id="overlap-oil" class="section level3">
 <h3>Overlap: Oil</h3>
-<p>It also looks like things that are categorized as “oil” might be picking up other keywords too. This table looks only at things that are oil, and then what other, additional keywords they also pick up, their pecent of all inhalants in the market, and percentage of oils in the market.</p>
-<p>It appears that 39.57% of the oils are also listed as cartridges, which makes sense. It might be best to categorize as “cartridge” first, and “oil” if not a cartridge. Also 8.47% of “oils” are also picking up other keywords, which is something we could explore further to determine how to categorize.</p>
+<p>It also looks like things that are categorized as “oil” are picking up other keywords too. This table looks only at products that have “oil” in the name, and then what other, additional keywords they also pick up, along with the percentage of inhalant market and percentage of “oil” products that also contain that keyword.</p>
+<p>It appears that 39.57% of the oils are also listed as cartridges, which is not surprising. It might be best to categorize as “cartridge” first, and “oil” if not a cartridge. Also 8.47% of “oils” are also picking up other keywords, which is something we could explore further to determine how to categorize. For example, 4.19% of products that contain the string “oil” also contain the string “dab”, and 2.82% of oil product names also contain the string “hash”.</p>
 <table>
 <thead>
 <tr class="header">
@@ -366,20 +370,14 @@ $(document).ready(function () {
 <td align="right">0.00</td>
 <td align="right">0</td>
 </tr>
-<tr class="even">
-<td align="right">uncategorized</td>
-<td align="right">0.00</td>
-<td align="right">0.00</td>
-<td align="right">0</td>
-</tr>
 </tbody>
 </table>
 </div>
 </div>
 <div id="processor-types" class="section level1">
 <h1>Processor Types</h1>
-<p>A way to possibly double check our above classifications, and to attempt to classify those that were “uncategorized”, is to look at the inventory types for the processors.</p>
-<p>For about half of the inhalants, the processor also listed the product type as “Marijuana Extract for Inhalation”, but for the other half, we have more detail about what went into the product. It also may be possible, if needed or useful, to try to go back one further step in the suppy chain to see what inventory types came before “Extract for Inhalation”.</p>
+<p>We can look at the processors’ inventory types to as a way to classify those that were “uncategorized”, as well as to double check our above classifications.</p>
+<p>For about half of the inhalants, the processor also listed the product type as “Marijuana Extract for Inhalation”, but for the other half, we have more detail about what went into the product. It also may be possible, if needed or useful, to try to go back one further step in the suppy chain to see what inventory types came before “Marijuana Extract for Inhalation” for a given product.</p>
 <table>
 <thead>
 <tr class="header">
@@ -435,7 +433,7 @@ $(document).ready(function () {
 <table>
 <thead>
 <tr class="header">
-<th align="right">Processor’s Inventory Type</th>
+<th align="right">Processor’s Inventory Type - Only Uncategorized</th>
 <th align="right">Percent of Uncategorized</th>
 <th align="right">Count</th>
 </tr>
@@ -489,13 +487,16 @@ $(document).ready(function () {
 <ul>
 <li>Explore the still uncategorized inhalants to see if they have any time, price, potency, etc trends</li>
 <li>Explore the 7% of overlapping keyword classifications and determine how to categorize them</li>
-<li>Possibly aggregage back up into more generalized inhalant categories like “cartidge”, “dab / wax / shatter”, “other”, or something else that more generally captures either use-type, potency cluster, or both</li>
 <li>Scatterplot of existing categories, possible cluster model, which may also help classify the uncategorized</li>
+<li>Possibly aggregage back up into more generalized inhalant categories like “cartidge”, “concentrate”, “other”, or something else that more generally captures either use-type, potency cluster, or both</li>
+<li>Use these categories for futher analysis of the inhalant market</li>
 </ul>
 </div>
 <div id="data-cleaning-and-error-checking" class="section level1">
 <h1>Data cleaning and error checking</h1>
 <p>I noticed a few oddities while working through the data that are worth noting for future work and cleaning.</p>
+<div id="non-retailers-in-dispensing-file" class="section level4">
+<h4>Non-retailers in dispensing file</h4>
 <p>First, there are three instances in the dispensing (aka retail) table where the location type is not a retailer. They all have negative sale prices, so I’m thinking someone coded refunds as going back to the Processor or Producer-Processor.</p>
 <table>
 <thead>
@@ -535,6 +536,9 @@ $(document).ready(function () {
 </tr>
 </tbody>
 </table>
+</div>
+<div id="retailer-products-connected-to-others-inventories" class="section level4">
+<h4>Retailer products connected to other’s inventories</h4>
 <p>I also noticed that in 0.5% of dispensing rows, when you link back to the inventory file, the inventory location does not match the retailer’s location.</p>
 <p>While this is a small portion of the overall dispensing and inventory, the median number of different inventory locations listed for each retail location is 4, which includes those that only have one inventory location listed.</p>
 <p>This displays a sample of what these combinations look like.</p>
@@ -688,7 +692,11 @@ $(document).ready(function () {
 </tr>
 </tbody>
 </table>
+</div>
+<div id="missing-product-names" class="section level4">
+<h4>Missing product names</h4>
 <p>Lastly, <code>productname</code> is missing for 5.5% of inhalants. This is compared to an estimated 6% of retail products of all types that are missing product names.</p>
+</div>
 </div>
 
 

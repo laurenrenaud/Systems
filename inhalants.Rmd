@@ -2,10 +2,13 @@
 title: "Classifying Extracts for Inhalation"
 author: "Lauren Renaud"
 date: "March, 2017"
-output: 
+output:
   html_document:
-    toc: true
+    toc: yes
     toc_depth: 4
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
 ---
 
 ```{r setup, include=FALSE}
@@ -142,17 +145,19 @@ num.keywords <- inhalantnames %>%
 
 # Key findings
 
- - Able to perform some form of **classification for about `r round(sum(!inhalants$uncategorized) / nrow(inhalants)*100,0)`%** of the products for inhalation in the dispensing file.
+ - Able to perform some form of **classification for about `r round(sum(!inhalants$uncategorized) / nrow(inhalants)*100,0)`%** of the products for inhalation in the dispensing file (counted by number of items sold in the dispensing file).
  - Including processors' inventory types in the process should get the number of **unclassified inhalants down to about 16%**.
  - Need to review these preliminary categories from a domain standpoint, and to consider purposes of classification.
- - May need stricter categorization for about `r round(sum(num.keywords$distro_numkeywords[num.keywords$numCat>1]) / nrow(inhalantnames)*100,0)`% of products that match more than one keyword. 
+ - May need stricter categorization for about `r round(sum(num.keywords$distro_numkeywords[num.keywords$numCat>1]) / nrow(inhalantnames)*100,0)`% of products sold that match more than one keyword. 
 
 
-# Initial classification
+# Initial classification: Keyword Search
 
-Our first pass at categorizing inhalants is by searching product names for what would indicate product types. This method is able to classify `r round(sum(!inhalants$uncategorized) / nrow(inhalants)*100,1)`% of the products for inhalation in the dispensing file, which is `r round(sum(!inhalantnames$uncategorized) / nrow(inhalantnames)*100,1)`% of inhalant product names.
+Our first pass at categorizing inhalants is by searching product names for what would indicate product types. This method is able to classify `r round(sum(!inhalants$uncategorized) / nrow(inhalants)*100,1)`% of "Marijuana Extract for Inhalation" products that were sold in the dispensing file, which is `r round(sum(!inhalantnames$uncategorized) / nrow(inhalantnames)*100,1)`% of inhalant product names.
 
-This table shows how many products fit each classification as well as the strings used for classificiation. (For "hash", it also picks up "hashish", but hashish was not searched for separately.) These do not sum to 100% because `r round(sum(num.keywords$distro_numkeywords[num.keywords$numCat>1]) / nrow(inhalantnames)*100,1)`% of product names contain more than one string.
+This table shows how many products fit each classification as well as the strings used for classificiation. (For "hash", it also picks up "hashish", but hashish was not searched for separately.) These do not sum to 100% because `r round(sum(num.keywords$distro_numkeywords[num.keywords$numCat>1]) / nrow(inhalantnames)*100,1)`% of product names contain more than one string. `Count` here is counting number of products appearing in the dispensing (retail) file, not a count of product names.
+
+While we could do a more thorough analysis of all the overlapping keywords, for this preliminary pass below we can look at "cartridges" and "oil" to see what the overlap for these keywords look like.
 
 ```{r prelimcat_table, warning=FALSE}
 
@@ -169,9 +174,9 @@ prelimCat_labels <- prelimCat_labels[, c(refcols, setdiff(names(prelimCat_labels
 knitr::kable(prelimCat_labels, col.names = c("Search String", "Keyword", "Percent", "Count"),
              # make all columns right aligned so it's easier to see keyword near percent value
                align=c("r", "r", "r", "r"))
+
 ```
 
-While we could do a more thorough analysis of all the overlapping keywords, we can first look at "cartridges" and "oil" first to see what these look like.
 
 ### Overlap: Cartridges
 
@@ -183,9 +188,9 @@ overlap.cart <- inhalants %>%
   # get a total count of number of cartridges
   dplyr::mutate(cart_count = n()) %>%
   # select that count, row identifier, and then catetories other than cartridge
-  dplyr::select(cart_count, dispensingid, BHO:uncategorized) %>%
+  dplyr::select(cart_count, dispensingid, oil:wax) %>%
   # use gather to get dispensingid + one colum for keyword + one colum for true or false
-  tidyr::gather(keyword, status, BHO:uncategorized) %>%
+  tidyr::gather(keyword, status, oil:wax) %>%
   # group on keyword to get statistics for each keyword
   dplyr::group_by(keyword) %>%
   dplyr::summarise(
@@ -203,11 +208,12 @@ overlap.cart <- inhalants %>%
 
 In a cursory look at the product names, it looked like things that are categorized as "cartridges" might be picking up other keywords too. This table looks only at things that are cartridges, and then what other, additional keywords they also pick up, as well as their pecent of all inhalants in the market, and percentage of cartridges in the market.
 
-Overall `r sum(overlap.cart$perc.cart)`% of cartidges are picking up other keywords, with the highest being butane hash oil at `r sum(overlap.cart$perc.cart[overlap.cart$keyword=="BHO"])`% of the cartridges. We will have to consider whether to categorize as "cartridge" first, or as BHO, or as something like "BHO cartridge", and similarly but less pressing with other subcategories of cartridges.
+Overall `r sum(overlap.cart$perc.cart)`% of cartidges are picking up other keywords, with the highest being "`r overlap.cart[1,1]`" at `r overlap.cart[1,3]`% followed by "`r overlap.cart[2,1]`" at `r sum(overlap.cart$perc.cart[overlap.cart$keyword=="BHO"])`% of the cartridges. We will have to consider whether to categorize as "cartridge" first, or as oil or BHO, or as something like "BHO cartridge" as compared to "General cartridge", for example. Similarly we need to make the same judgements with other subcategories of cartridges, though there are fewer products in the market with these other combinations of keywords.
 
 ```{r, prelimcat_cartridges2, warning=FALSE}
 knitr::kable(overlap.cart, col.names = c("Keyword", "% of Inhalants", "% of Cartidges", "Count"),
                align=c("r", "r", "r", "r"))
+
 ```
 
 ### Overlap: Oil
@@ -221,9 +227,9 @@ overlap.oil <- inhalants %>%
   dplyr::mutate(oil_count = n()) %>%
   # select only that count of rows in this filtered dataframe,
   # row identifier, and classifications other than oil
-  dplyr::select(oil_count, dispensingid, cartidge, BHO:uncategorized) %>%
+  dplyr::select(oil_count, dispensingid, cartidge, BHO:wax) %>%
   # gather to get row identified + column of keywords + column of T/F values
-  tidyr::gather(keyword, status, cartidge, BHO:uncategorized) %>%
+  tidyr::gather(keyword, status, cartidge, BHO:wax) %>%
   # group by keyword to get statistics for each keyword
   dplyr::group_by(keyword) %>%
   dplyr::summarise(
@@ -239,9 +245,9 @@ overlap.oil <- inhalants %>%
 
 ```
 
-It also looks like things that are categorized as "oil" might be picking up other keywords too. This table looks only at things that are oil, and then what other, additional keywords they also pick up, their pecent of all inhalants in the market, and percentage of oils in the market.
+It also looks like things that are categorized as "oil" are picking up other keywords too. This table looks only at products that have "oil" in the name, and then what other, additional keywords they also pick up, along with the percentage of inhalant market and percentage of "oil" products that also contain that keyword.
 
-It appears that `r sum(overlap.oil$perc.oil[overlap.oil$keyword=="cartidge"])`% of the oils are also listed as cartridges, which makes sense. It might be best to categorize as "cartridge" first, and "oil" if not a cartridge. Also `r sum(overlap.oil$perc.oil[!overlap.oil$keyword=="cartidge"])`% of "oils" are also picking up other keywords, which is something we could explore further to determine how to categorize.
+It appears that `r sum(overlap.oil$perc.oil[overlap.oil$keyword=="cartidge"])`% of the oils are also listed as cartridges, which is not surprising. It might be best to categorize as "cartridge" first, and "oil" if not a cartridge. Also `r sum(overlap.oil$perc.oil[!overlap.oil$keyword=="cartidge"])`% of "oils" are also picking up other keywords, which is something we could explore further to determine how to categorize. For example, `r overlap.oil[2,3]`% of products that contain the string "oil" also contain the string "`r overlap.oil[2,1]`", and `r overlap.oil[3,3]`% of oil product names also contain the string "`r overlap.oil[3,1]`".
 
 ```{r prelimcat_oil2, warning=FALSE}
 knitr::kable(overlap.oil, col.names = c("Keyword", "% of Inhalants", "% of Oils", "Count"),
@@ -250,9 +256,9 @@ knitr::kable(overlap.oil, col.names = c("Keyword", "% of Inhalants", "% of Oils"
 
 # Processor Types
 
-A way to possibly double check our above classifications, and to attempt to classify those that were "uncategorized", is to look at the inventory types for the processors.
+We can look at the processors' inventory types to as a way to classify those that were "uncategorized", as well as to double check our above classifications.
 
-For about half of the inhalants, the processor also listed the product type as "Marijuana Extract for Inhalation", but for the other half, we have more detail about what went into the product. It also may be possible, if needed or useful, to try to go back one further step in the suppy chain to see what inventory types came before "Extract for Inhalation".
+For about half of the inhalants, the processor also listed the product type as "Marijuana Extract for Inhalation", but for the other half, we have more detail about what went into the product. It also may be possible, if needed or useful, to try to go back one further step in the suppy chain to see what inventory types came before "Marijuana Extract for Inhalation" for a given product.
 
 ```{r processortypes, warning=FALSE}
 # combinations of inventory types
@@ -289,7 +295,7 @@ More excitingly, we should be able to classify an additional `r round(sum(proces
 
 ```{r processortypes2, warning=FALSE}
 
-knitr::kable(process.types.uncategorized, col.names = c("Processor's Inventory Type",
+knitr::kable(process.types.uncategorized, col.names = c("Processor's Inventory Type - Only Uncategorized",
                                                         "Percent of Uncategorized",
                                                         "Count"),
              align=c("r", "r", "r"))
@@ -300,13 +306,16 @@ knitr::kable(process.types.uncategorized, col.names = c("Processor's Inventory T
 
  - Explore the still uncategorized inhalants to see if they have any time, price, potency, etc trends
  - Explore the `r round(sum(num.keywords$distro_numkeywords[num.keywords$numCat>1]) / nrow(inhalantnames)*100,1)`% of overlapping keyword classifications and determine how to categorize them
- - Possibly aggregage back up into more generalized inhalant categories like "cartidge", "dab / wax / shatter", "other", or something else that more generally captures either use-type, potency cluster, or both
  - Scatterplot of existing categories, possible cluster model, which may also help classify the uncategorized
+ - Possibly aggregage back up into more generalized inhalant categories like "cartidge", "concentrate", "other", or something else that more generally captures either use-type, potency cluster, or both
+ - Use these categories for futher analysis of the inhalant market
 
 
 # Data cleaning and error checking
 
 I noticed a few oddities while working through the data that are worth noting for future work and cleaning.
+
+#### Non-retailers in dispensing file
 
 First, there are three instances in the dispensing (aka retail) table where the location type is not a retailer. They all have negative sale prices, so I'm thinking someone coded refunds as going back to the Processor or Producer-Processor.
 
@@ -368,6 +377,8 @@ avg.combos <- test.combos %>%
   dplyr::summarise(avg.combos = median(count, na.rm=T))
 ```
 
+#### Retailer products connected to other's inventories
+
 I also noticed that in `r round(sum(test.combos$combocount[test.combos$combocount < 97]) / nrow(test.retaillocations)*100,1)`% of dispensing rows, when you link back to the inventory file, the inventory location does not match the retailer's location.
 
 While this is a small portion of the overall dispensing and inventory, the median number of different inventory locations listed for each retail location is `r round(avg.combos$avg.combos,1)`, which includes those that only have one inventory location listed.
@@ -381,6 +392,8 @@ head(test.combos, 15) %>%
                            "Percent", "Dispense City", "Inv City",
                            "Inv Location Type"))
 ```
+
+#### Missing product names
 
 Lastly, `productname` is missing for `r round(sum(is.na(inhalants.joined$retail_prodname)) / nrow(inhalants.joined)*100,1)`% of inhalants. This is compared to an estimated 6% of retail products of all types that are missing product names.
 
