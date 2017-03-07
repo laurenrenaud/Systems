@@ -27,18 +27,23 @@ setwd("~/CMU/Spring 2017/Systems/Data")
 
 # read in the data
 fmt <- read.csv('fail_merge_time.csv')
+lab_codes <- read.csv('lab_codes.csv')
 
 # fix the dates -----------------------------------------------
+# Convert to mdy
 fmt$date <- mdy(fmt$test_date)
+# Get month and year
 fmt$month <- month(as.POSIXlt(fmt$date, format="%d/%m/%Y"))
+# Get year
 fmt$year <- year(as.POSIXlt(fmt$date, format="%d/%m/%Y"))
+# Get month year
 fmt$month_Yr <- format(as.Date(fmt$date), "%Y-%m")
 
 
 # Fail Rate for Micro Tests
 micro_all <- fmt %>%
   dplyr::select(lab_id, Test, num_fail, total_tests, month_Yr) %>%
-  dplyr::filter(Test == "Micro Screen") %>%
+  dplyr::filter(Test == "Micro Screen") %>% # Subset to Micro Screen only
   dplyr::arrange(month_Yr) %>%
   dplyr::group_by(lab_id, month_Yr) %>%
   dplyr::summarise(month_fail = sum(num_fail), month_tot = sum(total_tests)) %>%
@@ -48,7 +53,6 @@ micro_all <- fmt %>%
   dplyr::filter(month_tot > 200) 
 
 
-full_dates <- rbind(micro_all, dates)  
 
 t <- list(
   family = "arial black",
@@ -95,29 +99,32 @@ all <- fmt %>%
   dplyr::select(lab_id, Test, num_fail, total_tests, month_Yr) %>%
   dplyr::arrange(month_Yr) %>%
   dplyr::group_by(lab_id, month_Yr) %>%
-  dplyr::summarise(month_fail = sum(num_fail), month_tot = sum(total_tests)) %>%
-  dplyr::mutate(mo_fail_rate = month_fail/month_tot) %>%
+  dplyr::summarise(month_fail = sum(num_fail), month_tot = sum(total_tests)) %>% # Calculate the monthly fails
+  dplyr::mutate(mo_fail_rate = month_fail/month_tot) %>% # Calculate the monthly fail rate
   dplyr::group_by(lab_id) %>%
-  dplyr::mutate(lab_tot = cumsum(month_tot)) %>%
-  dplyr::filter(month_tot > 200) 
+  dplyr::mutate(lab_tot = cumsum(month_tot)) %>% # Calculate the cumulative sum of samples received
+  dplyr::filter(month_tot > 200) %>% # limit to months that received > 200 samples
+  dplyr::left_join(lab_codes, by = "lab_id") # bring in lab codes to deidentify
 
-
+# Set fonts to text
 t <- list(
   family = "arial black",
   size = 18,
   color = toRGB("black"))
-
+# Set X-axis
 x <- list(
   title = 'Cumulative Number of Tests Processed'
 )
+# Set y-axis
 y <- list(
   title = 'Monthly Fail Rate'
 )
 
+# Set up plot
 base <- all %>%
-  plot_ly(x = ~lab_tot, y = ~mo_fail_rate,  mode = "markers",
-          text = ~lab_id, hoverinfo = "text",
-  marker = list(size = 40,
+  plot_ly(x = ~lab_tot, y = ~mo_fail_rate,  mode = "markers", # x=cumulative total y=monthly fail rate
+          text = ~code, hoverinfo = "text", # put text as lable on circles
+  marker = list(size = 40, # set color and size of circles
               color = 'limegreen',
               line = list(color = 'darkgreen',
                           width = 2))) %>%
@@ -126,13 +133,13 @@ base <- all %>%
          xaxis = x) 
 
 base %>%
-  add_markers(frame = ~month_Yr, ids = ~lab_id) %>%
-  animation_opts(1000, easing = "elastic", transition = 0) %>%
+  add_markers(frame = ~month_Yr, ids = ~code) %>% # include animation over time
+  animation_opts(1000, easing = "elastic", transition = 0) %>% # control speed of animation
   animation_button(
-    x = 1, xanchor = "right", y = 0, yanchor = "bottom"
+    x = 1, xanchor = "right", y = 0, yanchor = "bottom" # place the play button
   ) %>%
   animation_slider(
-    currentvalue = list(prefix = "Month & Year ", font = list(color="red"))
+    currentvalue = list(prefix = "Month & Year ", font = list(color="red")) # ad count to slider (not working) 
   ) %>%
   add_text(textfont = t, textposition = "center") %>%
   hide_legend()
