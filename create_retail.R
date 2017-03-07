@@ -1,5 +1,6 @@
 library(dplyr)
 library(readr)
+library(ggplot2)
 
 # pull in & clean dfs ------
 # locatons
@@ -10,7 +11,7 @@ retail.loc <- filter(locations, retail==1)
 inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
 inventory$inv_date <- as.Date(as.POSIXct(inventory$sessiontime,
-                                            origin = "1970-01-01", tz="America/Los_Angeles"))
+                                         origin = "1970-01-01", tz="America/Los_Angeles"))
 inventory <- rename(inventory, inventoryid = id)
 inventory <- left_join(inventory, inventory.types, by="inventorytype")
 inventory$sample_id <- as.numeric(inventory$sample_id)
@@ -84,23 +85,101 @@ write.table(inhalants, file="../data/Dec2016/cleaned/samples/inahlants.csv", sep
 # Connect to dispensing to inventory to producers inventory
 locations <- readr::read_csv("../data/Dec2016/cleaned/locations/all_locations.csv")
 loc.simp <- select(locations, location_id, name, typesimp)
+transfers <- readr::read_csv("../data/Dec2016/biotrackthc_inventorytransfers.csv")
+transfers$inventoryid <- as.numeric(transfers$inventoryid)
+transfers$parentid <- as.numeric(transfers$parentid)
+trans.select <- select(transfers, trans_id = id, trans_invid = inventoryid, trans_invtype = inventorytype,
+                       trans_loc = location, trans_inloc = inbound_location,
+                       trans_strain = strain, trans_parentid = parentid, trans_saleprice = saleprice, 
+                       trans_unitprice = unitprice, trans_descr = description)
+trans.select <- left_join(trans.select, inventory.types, by=c("trans_invtype" = "inventorytype"))
+trans.select <- rename(trans.select, trans_invtypename = inv_type_name)
+trans.select <- trans.select %>%
+  left_join(loc.simp, by=c("trans_loc" = "location_id")) %>%
+  rename(trans_locname = name, trans_loctype = typesimp) %>%
+  left_join(loc.simp, by=c("trans_inloc" = "location_id")) %>%
+  rename(trans_inlocname = name, trans_inloctype = typesimp)
+
+
 inventory$parentid <-as.numeric(inventory$parentid)
+
+# come back and use transfers in order to get price the
+# retailer paid
+# also need to figure out how units / weights work in here
+
 
 retail <- dispensing %>%
   # first going back to retailer's inventory
   dplyr::left_join(inventory, by="inventoryid") %>%
   # then getting potency
-  dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
+  #dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
   # renaming and dropping variables
-  dplyr::select(dispensingid, retail_loc = location.x, price, price_x, usableweight = usableweight.x,
-                inv_type_name = inv_type_name.x, inventoryid = inventoryid.x, parentid,
-                strain, productname, CBD, THC, THCA, Total, weight = weight.x, saledate = monthtime,
-                transactionid = transactionid.x, deleted = deleted.x, refunded, inventorytype = inventorytype.x,
-                inventoryparentid, retail_invdate = inv_date) %>%
+  dplyr::select(dispensingid, retail_loc = location.x, retail_price = price, retail_price_x = price_x,
+                retail_usableweight = usableweight.x,
+                retail_typename = inv_type_name.x, retail_inventoryid = inventoryid,
+                retail_parentid = parentid,
+                retail_strain = strain, retail_weight = weight.x, saledate = monthtime,
+                retail_transactionid = transactionid.x, retail_deleted = deleted.x, refunded, 
+                retail_invtype = inventorytype.x,
+                retail_invparentid = inventoryparentid, retail_invdate = inv_date)
+# same number of entries in retail than in dispensing at this point
+
+retail <- retail %>%
   # details on retailer's location
   dplyr::left_join(loc.simp, by=c("retail_loc" = "location_id")) %>%
-  dplyr::rename(retail_name = name, retail_parentid = parentid) %>%
-  dplyr::select(-(typesimp)) %>%
+  dplyr::rename(retail_name = name) %>%
+  dplyr::select(-(typesimp))
+# same number of entries in retail than in dispensing at this point
+
+# there were some (3.5%) of dispensing IDs that came up duplicate on this join
+# it appears they have multiple transferIDs that are causing the problem
+# need to look into it further, but dropping them for now
+retail.id.check <- select(retail, dispensingid, retail_inventoryid)
+trans.id.check <- select(trans.select, trans_id, trans_invid)
+dupe.disID <- retail.id.check %>%
+  left_join(trans.id.check, by=c("retail_inventoryid" = "trans_invid")) %>%
+  group_by(dispensingid) %>%
+  summarise(count = n()) %>%
+  filter(count > 1) #%>%
+#arrange(desc(count)) %>%
+#left_join(retail, by="dispensingid")
+
+# join to transfers to get producer prices
+retail <- retail %>%
+  # filter out the duplicate dispening ids
+  filter(!dispensingid %in% dupe.disID$dispensingid) %>%
+  # pull in transfers to get producer to retail prices (and locations)
+  dplyr::left_join(trans.select, by=c("retail_inventoryid" = "trans_invid"))
+
+# correcting for useable weight & weight
+retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
+                               retail$retail_price_x / retail$retail_usableweight,
+                               retail$retail_price_x / retail$retail_weight)
+
+# sampling for plotting, use smaller number for export
+retail.list <- sample(retail$dispensingid, 150000, replace=F)
+retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
+# write.table(retail.sample, file="../data/Dec2016/cleaned/testing/retailToTransfers.csv",
+#             sep=",", row.names = F)
+
+# plotting markups
+retail.sample %>%
+  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+         retail_typename=="Usable Marijuana" | retail_typename=="Marijuana Extract for Inhalation" |
+           retail_typename=="Liquid Marijuana Infused Edible" | retail_typename=="Solid Marijuana Infused Edible"
+         ) %>%
+  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  geom_point(alpha=0.25, color="darkgreen") + 
+  geom_smooth(color="gold2") +
+  facet_wrap("retail_typename") +
+  labs(title="Relationship Between Processor and Retail Prices",
+       x="Processor's Unit Price",
+       y="Retail Sale Unit Price")
+
+
+# can join to processors' inventories to get their times, productnames, etc
+retail <- retail %>%
   # then connecting from retailer's inventory to processors parentid
   dplyr::left_join(inventory, by=c("retail_parentid" = "inventoryid")) %>%
   # renaming and dropping variables
@@ -111,7 +190,7 @@ retail <- dispensing %>%
                 retail_invtype = inventorytype.x, inventoryparentid = inventoryparentid.x, retail_name,
                 process_loc = location, prococss_invtype = inventorytype.y, process_invdate = inv_date,
                 process_invtypename = inv_type_name.y)
-  
+
 # testing time differences
 retail.list <- sample(retail$dispensingid, 20000, replace=F)
 retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
@@ -268,7 +347,7 @@ table(testingjoin$nametest)
 table(testingjoin$typetest)
 table(testingjoin$transtype)
 
- # how many do not match between sales and processor inventory
+# how many do not match between sales and processor inventory
 sum(testingjoin$typetest, na.rm=T) / nrow(testingjoin)
 
 # checking mismatched inventory types
@@ -277,7 +356,7 @@ testing_types <- test_step2 %>%
   select(dispensingid, sale_invtype, processor_invtype) %>%
   group_by(sale_invtype, processor_invtype) %>%
   summarise(count = n())
-  
+
 # checking mismatched product names
 test_step2$sale_strain <- as.factor(test_step2$sale_strain)
 testing_productnames <- test_step2 %>%
