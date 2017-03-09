@@ -10,9 +10,11 @@ retail.loc <- filter(locations, retail==1)
 # inventory
 inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
+# convert date
 inventory$inv_date <- as.Date(as.POSIXct(inventory$sessiontime,
                                          origin = "1970-01-01", tz="America/Los_Angeles"))
 inventory <- rename(inventory, inventoryid = id)
+# bring in inventory types names
 inventory <- left_join(inventory, inventory.types, by="inventorytype")
 inventory$sample_id <- as.numeric(inventory$sample_id)
 inventory.retail <- filter(inventory, location %in% retail.loc$location_id)
@@ -24,6 +26,7 @@ dispensing$monthtime <- as.Date(as.POSIXct(dispensing$sessiontime,
 dispensing$price_x <- ifelse(dispensing$monthtime >= "2015-07-01", 
                              dispensing$price*1.37, 
                              dispensing$price)
+# get inventory type names
 dispensing <- left_join(dispensing, inventory.types, by="inventorytype")
 dispensing$inv_type_name <- as.factor(dispensing$inv_type_name)
 dispensing <- rename(dispensing, dispensingid = id)
@@ -88,15 +91,19 @@ loc.simp <- select(locations, location_id, name, typesimp)
 transfers <- readr::read_csv("../data/Dec2016/biotrackthc_inventorytransfers.csv")
 transfers$inventoryid <- as.numeric(transfers$inventoryid)
 transfers$parentid <- as.numeric(transfers$parentid)
+# get selected variables and rename so they make sense in the joins later
 trans.select <- select(transfers, trans_id = id, trans_invid = inventoryid, trans_invtype = inventorytype,
                        trans_loc = location, trans_inloc = inbound_location,
                        trans_strain = strain, trans_parentid = parentid, trans_saleprice = saleprice, 
                        trans_unitprice = unitprice, trans_descr = description)
 trans.select <- left_join(trans.select, inventory.types, by=c("trans_invtype" = "inventorytype"))
 trans.select <- rename(trans.select, trans_invtypename = inv_type_name)
+
 trans.select <- trans.select %>%
+  # get labels and cities for the transfer locations
   left_join(loc.simp, by=c("trans_loc" = "location_id")) %>%
   rename(trans_locname = name, trans_loctype = typesimp) %>%
+  # get labels and cities for the inbound (retail) locations
   left_join(loc.simp, by=c("trans_inloc" = "location_id")) %>%
   rename(trans_inlocname = name, trans_inloctype = typesimp)
 
@@ -277,6 +284,11 @@ pullman.select <- retail.pullman %>%
 
 #write.table(pullman.select, file="../data/Dec2016/cleaned/samples/pullman_retailSelectVariables.csv", row.names=F, sep=",")
 
+
+
+########################################################
+######## After this, testing       ####################
+########################################################
 
 
 # number of unique dispensing ids before adding others = 474435

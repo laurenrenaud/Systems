@@ -12,11 +12,14 @@ processor.loc <- filter(locations, processor==1)
 # inventory
 inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
+# convert UNIX time
 inventory$inv_date <- as.POSIXct(inventory$sessiontime,
                                     origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
 inventory$inv_date <- as.Date(inventory$inv_date)
+# add in inventory type names
 inventory <- left_join(inventory, inventory.types, by="inventorytype")
 inventory$sample_id <- as.numeric(inventory$sample_id)
+# select needed variables and rename to be easier to understand later in the joins
 inventory.select <- select(inventory, inv_invid = id, inv_strain = strain, inv_weight = weight,
                            inv_location = location, inv_inv_type = inv_type_name, seized, inv_deleted = deleted,
                            inv_usableweight = usableweight, inv_invparentid = inventoryparentid,
@@ -30,6 +33,7 @@ transfers$usableweight <- as.numeric(transfers$usableweight)
 
 transfers.select <- transfers %>%
   #filter(inventoryparentid %in% dis.select$inventoryid) %>%
+  # select needed variables and rename to be easier to understand later in the joins
   select(trans_id = id, trans_invid = inventoryid, trans_strain = strain, trans_location = location,
          trans_parentid = parentid, trans_invtype = inventorytype, trans_usableweight = usableweight,
          trans_weight = weight,
@@ -43,6 +47,7 @@ transfers.select <- transfers.select %>%
 # get location names
 loc.name.city <- select(locations, trans_name = name, trans_license = licensenum, location_id,
                               trans_city = city, trans_loctype = locationtypeNames)
+# join in some selected location infomation
 transfers.select <- transfers.select %>%
   left_join(loc.name.city, by=c("trans_location" = "location_id"))
 transfers.select$trans_in_lisc <- as.integer(transfers.select$trans_in_lisc)
@@ -132,10 +137,12 @@ avg.procprice <- process.to.retail %>%
   group_by(trans_invtype) %>%
   summarise(avg_processorprice = median(trans_unitprice, na.rm=T))
 
+# plot avg sale price and avg producer price together
 avg.saleprice %>%
   filter(!is.na(inventorytype)) %>%
   left_join(avg.procprice, by=c("inventorytype" = "trans_invtype")) %>%
   left_join(inventory.types, by="inventorytype") %>%
+  # get one column with either sale price or processor price, another column with that value
   tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
   ggplot(aes(x=inv_type_name, y=avg_price, fill=supplystep)) +
   geom_bar(stat="identity", position="dodge") +
@@ -164,6 +171,7 @@ avg.sale.month <- dispensing.select %>%
   # so I created a numeric variable for joining the dataframes
   mutate(monthjoin = as.numeric(monthyear))
 
+# grouping by month to get avg by month
 avg.proc.month <- process.to.retail %>%
   mutate(monthyear = floor_date(inv_date, "month")) %>%
   group_by(trans_invtype, monthyear) %>%
