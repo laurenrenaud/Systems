@@ -1,6 +1,7 @@
 library(dplyr)
 library(readr)
 library(ggplot2)
+options(scipen=20)
 
 # pull in & clean dfs ------
 # locatons
@@ -285,9 +286,118 @@ pullman.select <- retail.pullman %>%
 #write.table(pullman.select, file="../data/Dec2016/cleaned/samples/pullman_retailSelectVariables.csv", row.names=F, sep=",")
 
 
+########################################################
+######## Inhalants data pull for Jon      ##############
+########################################################
+
+# selecting some stores
+# 445 is second highest total sales, Seattle
+# 237 also very high sales, Vancouver
+# 548 and 357 are both in Everett and have about same amount of sales as each other
+# 2011 & 1355 are both low sales and both in Puyallup
+
+loc.list <- c(445, 237, 357, 548, 2011, 1355, 556, 1489, 423, 1101, 238, 360)
+
+# recreating Steve's retail df ------
+inhalants.sample <- dispensing %>%
+  dplyr::filter(inventorytype==24, location %in% loc.list,
+                monthtime >= "2016-07-01", monthtime <= "2016-09-30") %>%
+  dplyr::left_join(inventory, by="inventoryid") %>%
+  dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
+  dplyr::select(dispensingid, location = location.x, price, price_x, usableweight = usableweight.x,
+                weight = weight.x, 
+                inv_type_name = inv_type_name.x, inventoryid = inventoryid.x,
+                strain, productname, CBD, THC, THCA, Total, saledate = monthtime,
+                transactionid = transactionid.x, deleted = deleted.x, refunded, 
+                inventoryparentid) %>%
+  left_join(locations.name.city, by=c("location" = "location_id"))
+
+# pull out pairs of transactions where one of the prices is zero
+# assuming these are refunds, even though not all marked as refunds
+# appears that the one sold gets marked as refunded
+# and the negative transaction isn't marked as refunded, but has negative price
+# does not appear to be consistent. Going to take out ones marked as refunded
+# as well as ones with negative price
+# also refunded is coded in the db as 1 or NA, so using is.na
+inhalants.sample <- inhalants.sample %>%
+  filter(is.na(refunded), price > 0) %>%
+  select(-refunded, -deleted)
+
+# not sure which one to use, testing with both to explore
+inhalants.sample$price_weight <- inhalants.sample$price_x / inhalants.sample$weight
+inhalants.sample$price_usable <- inhalants.sample$price_x / inhalants.sample$usableweight
+
+# quick categorization -------
+# first get list/df of inhalantnames
+inhalantnames <- as.data.frame(unique(inhalants.sample$productname))
+# rename column so we can call it
+colnames(inhalantnames) <- "productname"
+
+# get a df that is for each unique inhalant name, the boolean values for categorizing
+inhalantnames <- inhalantnames %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(cartridge = grepl("cart|vap|vc|pen|refill", productname, ignore.case = T),
+                type = ifelse(
+                  grepl("BHO|butane", productname, ignore.case = T), "BHO",
+                  ifelse(grepl("CO2", productname, ignore.case = T), "CO2",
+                         ifelse(grepl("hash", productname, ignore.case = T), "hash",
+                                ifelse(grepl("hash", productname, ignore.case = T), "kief",
+                                       ifelse(grepl("bubble", productname, ignore.case = T), "bubble",
+                                              ifelse(grepl("shatter", productname, ignore.case = T), "shatter",
+                                                     ifelse(grepl("dab", productname, ignore.case = T), "dab",
+                                                            ifelse(grepl("resin", productname, ignore.case = T), "resin",
+                                                                   ifelse(grepl("wax", productname, ignore.case = T), "wax",
+                                                                          "other"))))))))
+                )
+  )
+
+sum(inhalantnames$cartridge) / nrow(inhalantnames)
+sum(inhalantnames$cartridge[inhalantnames$type=="other"]) / sum(inhalantnames$cartridge)
+
+# join classified inhalantnames back to dispening df
+inhalants.sample$productname <- as.factor(inhalants.sample$productname)
+inhalants.sample <- left_join(inhalants.sample, inhalantnames, by="productname")
+
+# summaries
+# One observation for each store-productname with variables for Average and Std Dev of
+# Absolute value of price per gram
+# THC
+# CBD
+# Weight
+# Usable weight
+# And the # of sales, total dollar value of sales, and Store ID, plus 
+# anything obviouis that I’m missing (e.g., that variable that is BHO, C02, or NA)
+inhalants.summary <- inhalants.sample %>%
+  group_by(productname, location) %>%
+  summarise(
+    cartridge = cartridge[1],
+    type = type[1],
+    # note: used price_x to get price_weight and price_usable
+    avg_priceweight = median(price_weight, na.rm=T),
+    sd_priceweight = sd(price_weight, na.rm=T),
+    avg_weight = median(weight, na.rm=T),
+    sd_weight = sd(weight, na.rm=T),
+    avg_priceusable = median(price_usable, na.rm=T),
+    sd_priceusable = sd(price_usable, na.rm=T),
+    avg_usableweight = median(usableweight, na.rm=T),
+    sd_usableweight = sd(usableweight, na.rm=T),
+    avg_THC = median(Total, na.rm=T),
+    sd_THC = sd(Total, na.rm=T),
+    avg_CBD = median(CBD, na.rm=T),
+    sd_CBD = sd(CBD, na.rm=T),
+    num_sales = n(),
+    total_sales_price = sum(price, na.rm=T)
+  ) %>%
+  left_join(locations.name.city, by=c("location" = "location_id")) %>%
+  select(-licensenum)
+
+# write.table(inhalants.summary, file = "../data/Dec2016/cleaned/samples/inhalants_Q3sample.csv",
+#             row.names=F, sep=",")
+
+
 
 ########################################################
-######## After this, testing       ####################
+######## After this, testing        ####################
 ########################################################
 
 
