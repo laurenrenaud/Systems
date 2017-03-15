@@ -116,6 +116,25 @@ inhalantnames <- inhalantnames %>%
     uncategorized = (!cartidge & !oil & !BHO & !kief & !bubble & !shatter & !dab & !resin & !wax)
   )
 
+# alternate method that creates a boolean for cartridge or not cartridge
+# and then another column for 'type' that's more specific
+# inhalantnames <- inhalantnames %>%
+#   dplyr::rowwise() %>%
+#   dplyr::mutate(cartridge = grepl("cart|vap|vc|pen|refill", productname, ignore.case = T),
+#                 type = ifelse(
+#                   grepl("BHO|butane", productname, ignore.case = T), "BHO",
+#                   ifelse(grepl("CO2", productname, ignore.case = T), "CO2",
+#                          ifelse(grepl("hash", productname, ignore.case = T), "hash",
+#                                 ifelse(grepl("hash", productname, ignore.case = T), "kief",
+#                                        ifelse(grepl("bubble", productname, ignore.case = T), "bubble",
+#                                               ifelse(grepl("shatter", productname, ignore.case = T), "shatter",
+#                                                      ifelse(grepl("dab", productname, ignore.case = T), "dab",
+#                                                             ifelse(grepl("resin", productname, ignore.case = T), "resin",
+#                                                                    ifelse(grepl("wax", productname, ignore.case = T), "wax",
+#                                                                           "other"))))))))
+#                 )
+#   )
+
 # join classified inhalantnames back to dispening df
 inhalants.joined$retail_prodname <- as.factor(inhalants.joined$retail_prodname)
 inhalants <- left_join(inhalants.joined, inhalantnames, by="retail_prodname")
