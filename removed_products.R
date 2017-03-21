@@ -4,6 +4,7 @@ library(lubridate)
 library(ggplot2)
 library(RColorBrewer)
 library(tidyr)
+library(topicmodels)
 options(scipen=4)
 
 # pulling in tables
@@ -195,3 +196,64 @@ removedproduct %>%
   mutate(allremoved = n()) %>%
   group_by(typesimp) %>%
   summarise(perc = n() / allremoved[1] *100)
+
+
+# attemping LDA : Latent Dirichlet allocation
+# http://tidytextmining.com/topicmodeling.html
+# http://tidytextmining.com/tidytext.html
+
+# 1: convert strings into dataframe
+# and need to include which "line" it comes from
+removed.df <- data_frame(line=1:36466, text = removereasons)
+# 2: use tidytext to convert into one-token-per-document-per-row.
+library(tidytext)
+library(stringr)
+# this then includes a variable saying which line it initially came from
+# removed.df <- removed.df %>%
+#   unnest_tokens(word, text)
+
+inv_reasons <- inventory %>%
+  # keep only those with removed reasons and not categorized as "waste"
+  dplyr::filter(!is.na(removereason), inventorytype != 27) %>%
+  dplyr::left_join(loc.simp, by = c("location" = "location_id")) %>%
+  dplyr::left_join(inv.type, by="inventorytype") %>%
+  dplyr::select(inv_type_name, location, removereason, status) %>%
+  #group_by(inv_type_name) %>%
+  mutate(linenumber = row_number()) %>%
+  ungroup()
+
+removed.tidy <- inv_reasons %>%
+  unnest_tokens(word, removereason)
+
+# remove stop words (but should check those)
+data(stop_words)
+removed.tidy <- removed.tidy %>%
+  anti_join(stop_words)
+
+# create DocumentTermMatrix
+removed.docmatrix <- removed.tidy %>%
+  select(document = linenumber, term = word) %>%
+  group_by(document, term) %>%
+  summarise(count = n()) %>%
+  cast_dtm(document, term, count)
+
+ap_lda <- LDA(removed.docmatrix, k = 3, control = list(seed = 1234))
+ap_topics <- tidy(ap_lda, matrix = "beta")
+
+ap_top_terms <- ap_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+ap_top_terms %>%
+  mutate(term = reorder(term, beta)) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+ap_documents <- tidy(ap_lda, matrix = "gamma")
+ap_documents %>%
+  filter(topic==2) %>%
+  arrange(desc(gamma))
