@@ -79,7 +79,7 @@ retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
 
 # inhalants
 inhalants <- dplyr::filter(retail, inv_type_name=="Marijuana Extract for Inhalation")
-write.table(inhalants, file="../data/Dec2016/cleaned/samples/inahlants.csv", sep=",", row.names = F, col.names = T)
+#write.table(inhalants, file="../data/Dec2016/cleaned/samples/inahlants.csv", sep=",", row.names = F, col.names = T)
 
 
 ########################################################
@@ -394,6 +394,41 @@ inhalants.summary <- inhalants.sample %>%
 # write.table(inhalants.summary, file = "../data/Dec2016/cleaned/samples/inhalants_Q3sample.csv",
 #             row.names=F, sep=",")
 
+
+########################################################
+######## Inhalants pull for lab data ###################
+########################################################
+
+# labs -------
+solvents <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_solvent_screening.csv")
+labsamples <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_samples.csv")
+labsamples$inventoryid <- as.numeric(labsamples$inventoryid)
+solvents_tidy <- solvents %>%
+  dplyr::left_join(labsamples, by=c("sample_id" = "id")) %>%
+  # select only variables for retail set
+  # only including test_inventorytype and product name to confirm against inventory
+  # but should be duplicative
+  dplyr::select(sample_id, value, failure, test_inventorytype = inventorytype,
+                test_productname = product_name, inventoryid, inventoryparentid)
+
+# recreating Steve's retail df ------
+retail_solvents <- dispensing %>%
+  # limit to inhalants
+  dplyr::filter(inv_type_name == "Marijuana Extract for Inhalation") %>%
+  dplyr::left_join(inventory, by="inventoryid") %>%
+  dplyr::left_join(solvants_tidy, by="inventoryparentid") %>%
+  dplyr::select(dispensingid, location = location.x, price, price_x, usableweight = usableweight.x,
+                inv_type_name = inv_type_name.x, inventoryid = inventoryid.x,
+                strain, productname, value, failure, weight = weight.x, saletime = monthtime,
+                transactionid = transactionid.x, deleted = deleted.x, refunded, inventorytype = inventorytype.x,
+                inventoryparentid) %>%
+  left_join(locations.name.city, by=c("location" = "location_id"))
+
+# sample -----
+retail.list <- sample(retail_solvents$dispensingid, 20000, replace=F)
+retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
+#write.table(retail.sample, file="../data/Dec2016/cleaned/samples/retail_sample.csv", sep=",", row.names = F, col.names = T)
+write.table(retail_solvents, file="../data/Dec2016/cleaned/retail_solvents.csv", sep=",", row.names = F, col.names = T)
 
 
 ########################################################
