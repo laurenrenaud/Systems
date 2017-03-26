@@ -185,6 +185,61 @@ retail.sample %>%
        x="Processor's Unit Price",
        y="Retail Sale Unit Price")
 
+# instead of facet wrap, diff one for each -----
+# Usable
+retail.sample %>%
+  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+         retail_typename=="Usable Marijuana"
+  ) %>%
+  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  geom_point(alpha=0.25, color="darkgreen") + 
+  geom_smooth(color="gold2") +
+  facet_wrap("retail_typename") +
+  labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
+       x="Processor's Unit Price",
+       y="Retail Sale Unit Price")
+# Extracts for Inhalation
+retail.sample %>%
+  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+         retail_typename=="Marijuana Extract for Inhalation"
+  ) %>%
+  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  geom_point(alpha=0.25, color="darkgreen") + 
+  geom_smooth(color="gold2") +
+  facet_wrap("retail_typename") +
+  labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation",
+       x="Processor's Unit Price",
+       y="Retail Sale Unit Price")
+# Liquid edible
+retail.sample %>%
+  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+         retail_typename=="Liquid Marijuana Infused Edible"
+  ) %>%
+  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  geom_point(alpha=0.25, color="darkgreen") + 
+  geom_smooth(color="gold2") +
+  facet_wrap("retail_typename") +
+  labs(title="Relationship Between Processor and Retail Prices \nLiquid Marijuana Infused Edible",
+       x="Processor's Unit Price",
+       y="Retail Sale Unit Price")
+# Solid edible
+retail.sample %>%
+  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+         retail_typename=="Solid Marijuana Infused Edible"
+  ) %>%
+  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  geom_point(alpha=0.25, color="darkgreen") + 
+  geom_smooth(color="gold2") +
+  facet_wrap("retail_typename") +
+  labs(title="Relationship Between Processor and Retail Prices \nSolid Marijuana Infused Edible",
+       x="Processor's Unit Price",
+       y="Retail Sale Unit Price")
+
+
 
 # can join to processors' inventories to get their times, productnames, etc
 retail <- retail %>%
