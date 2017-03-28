@@ -24,7 +24,7 @@ inventory.select <- select(inventory, inv_invid = id, inv_strain = strain, inv_w
                            inv_location = location, inv_inv_type = inv_type_name, seized, inv_deleted = deleted,
                            inv_usableweight = usableweight, inv_invparentid = inventoryparentid,
                            inv_productname = productname, inv_date)
-inventory.processor <- filter(inventory.select, inv_location %in% processor.loc$location_id)
+#inventory.processor <- filter(inventory.select, inv_location %in% processor.loc$location_id)
 
 # transfers
 transfers <- readr::read_csv("../data/Dec2016/biotrackthc_inventorytransfers.csv")
@@ -101,9 +101,16 @@ dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
 dispensing$saletime <- as.Date(as.POSIXct(dispensing$sessiontime,
                                                  origin = "1970-01-01", tz="America/Los_Angeles"))
 # editing for post July tax change
-dispensing$price_x <- ifelse(dispensing$saletime >= "2015-07-01", 
-                             dispensing$price*1.37, 
-                             dispensing$price)
+# dispensing$price_x <- ifelse(dispensing$saletime >= "2015-07-01", 
+#                              dispensing$price*1.37, 
+#                              dispensing$price)
+
+# price_x wasn't working, but is working on sample. 
+sample.list <- sample(dispensing$id, 20000, replace=F)
+sample.dispense <- dplyr::filter(dispensing, id %in% sample.list)
+sample.dispense$price_x <- ifelse(sample.dispense$saletime >= "2015-07-01", 
+                                  sample.dispense$price*1.37, 
+                                  sample.dispense$price)
 
 
 # now joining transfers to retail.pullman to get processor names attached to items
@@ -122,8 +129,12 @@ retail.test <- dispensing %>%
 dispensing.select <- dplyr::select(dispensing, dispensingid = id, weight, saletime = sessiontime, 
                             price, inventorytype, location)
 
+dispensing.select$saletime <- as.Date(as.POSIXct(dispensing.select$saletime,
+                                          origin = "1970-01-01", tz="America/Los_Angeles"))
 
-
+dispensing.select$price_x <- ifelse(dispensing.select$saletime >= "2015-07-01", 
+                                    dispensing.select$price*1.37, 
+                                    dispensing.select$price)
 
 
 
@@ -170,6 +181,19 @@ avg.sale.month <- dispensing.select %>%
   # for some reason the join didn't work on the monthyear / date variable
   # so I created a numeric variable for joining the dataframes
   mutate(monthjoin = as.numeric(monthyear))
+
+### including time and post tax change
+avg.sale.month <- dispensing.select %>%
+  mutate(monthyear = floor_date(saletime, "month")) %>%
+  group_by(inventorytype, monthyear) %>%
+  summarise(avg_saleprice = ifelse(monthyear[1] >= "2015-07-01",
+                                   median((price*1.37), na.rm=T),
+                                   median(price, na.rm=T))
+  ) %>%
+  # for some reason the join didn't work on the monthyear / date variable
+  # so I created a numeric variable for joining the dataframes
+  mutate(monthjoin = as.numeric(monthyear))
+
 
 # grouping by month to get avg by month
 avg.proc.month <- process.to.retail %>%

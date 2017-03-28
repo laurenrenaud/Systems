@@ -3,7 +3,7 @@ library(readr)
 library(ggplot2)
 options(scipen=20)
 
-# pull in & clean dfs ------
+# pull in & clean dfs ---------
 # locatons
 locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
 locations.name.city <- select(locations, retailname = name, licensenum, location_id, city)
@@ -17,6 +17,7 @@ inventory$inv_date <- as.Date(as.POSIXct(inventory$sessiontime,
 inventory <- rename(inventory, inventoryid = id)
 # bring in inventory types names
 inventory <- left_join(inventory, inventory.types, by="inventorytype")
+
 inventory$sample_id <- as.numeric(inventory$sample_id)
 inventory.retail <- filter(inventory, location %in% retail.loc$location_id)
 # dispensing
@@ -109,14 +110,14 @@ trans.select <- trans.select %>%
   rename(trans_inlocname = name, trans_inloctype = typesimp)
 
 
-inventory$parentid <-as.numeric(inventory$parentid)
+inventory$parentid <- as.numeric(inventory$parentid)
 
 # come back and use transfers in order to get price the
 # retailer paid
 # also need to figure out how units / weights work in here
 
 
-retail <- dispensing %>%
+retail <- retail %>%
   # first going back to retailer's inventory
   dplyr::left_join(inventory, by="inventoryid") %>%
   # then getting potency
@@ -125,11 +126,9 @@ retail <- dispensing %>%
   dplyr::select(dispensingid, retail_loc = location.x, retail_price = price, retail_price_x = price_x,
                 retail_usableweight = usableweight.x,
                 retail_typename = inv_type_name.x, retail_inventoryid = inventoryid,
-                retail_parentid = parentid,
-                retail_strain = strain, retail_weight = weight.x, saledate = monthtime,
+                retail_parentid = parentid, retail_weight = weight.x, saledate = saletime,
                 retail_transactionid = transactionid.x, retail_deleted = deleted.x, refunded, 
-                retail_invtype = inventorytype.x,
-                retail_invparentid = inventoryparentid, retail_invdate = inv_date)
+                retail_invtype = inventorytype.x, retail_invdate = inv_date)
 # same number of entries in retail than in dispensing at this point
 
 retail <- retail %>%
@@ -167,8 +166,14 @@ retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
 # sampling for plotting, use smaller number for export
 retail.list <- sample(retail$dispensingid, 150000, replace=F)
 retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
-# write.table(retail.sample, file="../data/Dec2016/cleaned/testing/retailToTransfers.csv",
-#             sep=",", row.names = F)
+write.table(retail.sample, file="../data/Dec2016/cleaned/testing/retailToTransfers.csv",
+            sep=",", row.names = F)
+
+usable <- filter(retail, retail_typename=="Usable Marijuana")
+samplelist <- sample(usable$dispensingid, 20000, replace=F)
+retail.sample.usable <- dplyr::filter(retail, dispensingid %in% samplelist)
+write.table(retail.sample.usable, file="../data/Dec2016/cleaned/testing/retailUsable.csv",
+            sep=",", row.names = F)
 
 # plotting markups
 retail.sample %>%
@@ -179,7 +184,7 @@ retail.sample %>%
          ) %>%
   ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
   geom_point(alpha=0.25, color="darkgreen") + 
-  geom_smooth(color="gold2") +
+  geom_smooth(color="gold2", method="lm") +
   facet_wrap("retail_typename") +
   labs(title="Relationship Between Processor and Retail Prices",
        x="Processor's Unit Price",
@@ -194,8 +199,9 @@ retail.sample %>%
   ) %>%
   ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
   geom_point(alpha=0.25, color="darkgreen") + 
-  geom_smooth(color="gold2") +
+  geom_smooth(color="gold2", method = "lm") +
   facet_wrap("retail_typename") +
+  xlim(0, 55) + ylim(0, 55) +
   labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
        x="Processor's Unit Price",
        y="Retail Sale Unit Price")
