@@ -1,0 +1,332 @@
+---
+title: "Lab Fail Rate Analysis"
+author: "Krista Kinnard"
+date: "March 22, 2017"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(tidyr)
+library(readr)
+library(lubridate)
+library(stringr)
+library(plotly)
+library(reshape)
+library(gridExtra)
+
+# Set working directory & load data ---------------------------
+
+# Read in the data
+foreign_matter <- read.csv('biotrackthc_labresults_foreign_matter.csv')
+micro <- read.csv('biotrackthc_labresults_micro_screening.csv')
+moisture <- read.csv('biotrackthc_labresults_moisture_content.csv')
+solvent <- read.csv('biotrackthc_labresults_solvent_screening.csv')
+potency <- read.csv('biotrackthc_labresults_potency_analysis.csv')
+samples <- read.csv('biotrackthc_labresults_samples_2.csv')
+fail_merge <- read.csv('fail_merge.csv')
+lab_codes <- read.csv('lab_codes.csv')
+lab_market_share <- read.csv('lab_market_share.csv')
+fmt <- read.csv('fail_merge_time.csv')
+
+# Turn off Scientific Notation
+options(scipen=999)
+
+```
+
+## Not All Tests Are Created Equal
+Though the state has outlined which tests must be performed on which products, as well as the established limits as to the permissible quantity of contaminants in a sample, certain tests are of more interest than others in terms of monitoring the safety of marijuana products. Foreign Matter, for example, is off less interest to policy makers than Microbial and Residual Solvent testing. Microbes or residual solvent found in marijuana can have serious health implications for consumers. A more scrupulous evaluation of these tests is necessary for evaluating the safety of these products.
+
+## Measuring the Amount of Contaminants in Marijuana Samples from Producers (Growers)
+
+Labs upload lab results into the Washington State Database (with few exceptions). The lab results include the sample number, the tests run on that sample, the value of the content found for each test, whether or not the sample passed or failed the test, as well as the time and date of the test. 
+
+The value recorded is different for each test. For example, for residual solvent tests, results are measured in parts per million (ppm). The limit set by the state for residual solvent testing is 500 ppm. Any sample containing more than 500 ppm fails the test. Many microbial and mold tests are measured in Colony Forming Units per gram (CFU/g), though some are measured in grams. Moisture content measures the percent of the sample that was moisture.
+
+The graphs below illustrate the density distribution of the values of contaminant found for each test, divided into passing and failing groups. The vertical red lines illustrate the maximum amount of contaminant found for each test type. For the yeast and mold test, the red line is for flower products and the black line is for edibles.
+
+Foreign Matter, Moisture Content and Residual Solvent tests are straight forward tests that yield one result—a value and an indicator of pass or fail. 
+
+```{r, fig.width=12, fig.height=6, dpi=100, fig.align='center', message=FALSE, echo=FALSE}
+# Foreign Matter 
+# Filter out extreme values to fit into plot and create a fail/no fail flag
+fm4 <- foreign_matter %>%
+  dplyr::filter(value > 0 & value < 15) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail"))
+
+# Density plot for foreign matter
+fm_density <- ggplot(fm4, aes(x=value, fill =  fail)) + geom_density(alpha=0.6) + geom_vline(aes(xintercept=2.1), color="red", linetype="dashed", size=1) + geom_vline(aes(xintercept=5), color="red", linetype="dashed", size=1) + xlab("Value of Foreign Matter Detected (CFU/g)") +
+  ylab("Density") +
+  ggtitle("Foreign Matter Distribution") + theme(legend.position = "bottom") 
+
+# Moisture 
+# Filter out extreme values to fit into plot and create a fail/no fail flag
+ms <- moisture %>%
+  dplyr::filter(value > 0 & value <= 113) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail"))
+
+# Density plot for moisture
+ms_density <- ggplot(ms, aes(x=value, fill =  fail)) + geom_density(alpha=0.6) + geom_vline(aes(xintercept=15), color="red", linetype="dashed", size=1) + xlab("Value of Moisture Detected (%)") +
+  ylab("Density") +
+  ggtitle("Moisture Content Distribution") + theme(legend.position = "bottom") 
+
+# Solvent 
+# Filter out extreme values to fit into plot and create a fail/no fail flag
+sv <- solvent %>%
+  dplyr::filter(value > 0 & value <= 5000) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail"))
+
+# Density plot for solvent
+sv_density <- ggplot(sv, aes(x=value, fill =  fail)) + geom_density(alpha=0.6) + geom_vline(aes(xintercept=500), color="red", linetype="dashed", size=1) + xlab("Value of Residual Solvent Detected (ppm)") +
+  ylab("Density") +
+  ggtitle("Residual Solvent Distribution") + theme(legend.position = "bottom") 
+
+grid.arrange(fm_density, ms_density, sv_density, ncol = 3)
+```
+
+Microbial tests are subdivided into 5 subtests. Lab results for microbial tests include a value and an indicator of pass or fail for each of the 5 subtests performed on the sample.
+
+```{r, fig.width=12, fig.height=8, dpi=100, fig.align='center', message=FALSE, echo=FALSE}
+# Subset Micro data to Aerobic bacteria and filter out extreme values
+aerobic_bacteria <- micro %>%
+  dplyr::filter(name == "aerobic_bacteria") %>%
+  dplyr::filter(value > 0 & value < 150000) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail"))
+
+# Density plot for Aerobic bacteria
+a_density <- ggplot(aerobic_bacteria, aes(x=value, fill =  fail)) + geom_density(alpha=0.6) + geom_vline(aes(xintercept=100000), color="red", linetype="dashed", size=1) + xlab("Value of Aerobic Bacteria Detected (CFU/g)") +
+  ylab("Density") +
+  ggtitle("Aerobic Bacteria Distribution") + theme(legend.position = "bottom") 
+
+# Subset Micro data to Yeast and Mold and filter out extreme values
+yeast_and_mold <- micro %>%
+  dplyr::filter(name == "yeast_and_mold") %>%
+  dplyr::filter(value > 0 & value < 20000) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail")) 
+
+# Density plot for Yeast and Mold
+y_density <- ggplot(yeast_and_mold, aes(x=value, fill =  fail)) + geom_density(alpha=0.6) + geom_vline(aes(xintercept=1000), color="black", linetype="dashed", size=1) + geom_vline(aes(xintercept=10000), color="red", linetype="dashed", size=1)+ xlab("Value of Yeast & Mold Detected (CFU/g)") +
+  ylab("Density") +
+  ggtitle("Yeast & Mold Distribution") + theme(legend.position = "bottom") 
+
+# Subset Micro data to Coliforms and filter out extreme values
+coliforms <- micro %>%
+  dplyr::filter(name == "coliforms") %>%
+  dplyr::filter(value > 0 & value < 7000) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail"))
+
+# Density plot Coliforms
+c_density <- ggplot(coliforms, aes(x=value, fill =  fail)) +  geom_vline(aes(xintercept=1000), color="red", linetype="dashed", size=1) + geom_density(alpha=0.6) + xlab("Value of Coliforms Detected (CFU/g)") +
+  ylab("Density") +
+  ggtitle("Coliforms Distribution") + theme(legend.position = "bottom") 
+
+# Subset Micro data to bile tolerant bacteria and filter out extreme values
+bile_tolerant <- micro %>%
+  dplyr::filter(name == "bile_tolerant") %>%
+  dplyr::filter(value > 0 & value < 20000) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail"))
+
+# Density plot for bile tolerant bacteria
+b_density <- ggplot(bile_tolerant, aes(x=value, fill =  fail)) + geom_vline(aes(xintercept=1000), color="red", linetype="dashed", size=1) + geom_density(alpha=0.6) + xlab("Value of Bacteria Detected (CFU/g)") +
+  ylab("Density") +
+  ggtitle("Bile Tolerant Gram Negative Bacteria Distribution") + geom_density(alpha=0.6) + theme(legend.position = "bottom") 
+
+# Subset Micro data to E. coli and filter out extreme values
+e_coli_and_salmonella <- micro %>%
+  dplyr::filter(name == "e_coli_and_salmonella") %>%
+  dplyr::filter(value > 0 & value < 20000) %>%
+  dplyr::mutate(fail = ifelse(failure == 1, "Fail", "No Fail"))
+
+# Density plot for E. Coli
+e_density <- ggplot(e_coli_and_salmonella, aes(x=value, fill = fail)) + geom_vline(aes(xintercept=0), color="red", linetype="dashed", size=1) + geom_density(alpha=0.6) + xlab("Value of E.Coli Detected (g)") +
+  ylab("Density") +
+  ggtitle("E. Coli Distribution") + geom_density(alpha=0.6) + geom_density(alpha=0.6) + theme(legend.position = "bottom") 
+
+grid.arrange(a_density, b_density, c_density, e_density, y_density, ncol = 3)
+
+```
+
+It appears that there are no passing tests that have a higher value than is permitted by the state. Though in some cases, for instance Foreign Matter and Bile Tolerant Gram Negative Bacteria tests, there is a high number of samples with values just below the limit. 
+
+## The Number of Samples that Each Lab Fails is Relatively Low—Some Labs Even More So than Others
+
+One of the ways to gauge the reliability or trustworthiness of a lab is looking at its fail rate (the number of samples that fail out of all samples tested. Interestingly, it appears that the labs with the highest market share, that is to say labs that process high numbers of tests, tend to offer lower fail rates. The graphs below illustrate the overall fail rates for each lab. Each letter along the horizontal axis represents a lab. The labs are arranged in order of increasing market share, meaning the labs farthest to the right process the most tests. Foreign Matter, Micro Screening and Moisture Content are shown together since they have similar fail rates. Residual Solvent is shown separately with a larger range on the y-axis because there are higher fail rates for this test—a good sign since residual solvents pose the highest risk to human health.
+
+```{r, fig.width=12, fig.height=4, dpi=100, fig.align='center', message=FALSE, echo=FALSE}
+# Foreign Matter
+fm <- fail_merge %>%
+  dplyr::left_join(lab_codes, by = c("lab_license" = "lab_id")) %>%
+  dplyr::left_join(lab_market_share, by = c("lab_license" = "Lab")) %>%
+  dplyr::filter(Test == "Foreign Matter")
+
+fm_plot <- ggplot(data=fm, mapping=aes(x=reorder(code, market_share), y=Fail.Rate)) + geom_bar(colour="black", fill= "darkgreen", stat="identity") + ylim(0,0.10) +
+  xlab("Lab (Listed by Increaseing Market Share)") +
+  ylab("Fail Rate") +
+  ggtitle("Foreign Matter")  
+
+# Micro
+mic <- fail_merge %>%
+  dplyr::left_join(lab_codes, by = c("lab_license" = "lab_id")) %>%
+  dplyr::left_join(lab_market_share, by = c("lab_license" = "Lab")) %>%
+  dplyr::filter(Test == "Micro Screen")
+
+micro_plot <-  ggplot(data=mic, mapping=aes(x=reorder(code, market_share), y=Fail.Rate)) + geom_bar(colour="black", fill= "blue", stat="identity") + ylim(0,0.10) +
+  xlab("Lab (Listed by Increaseing Market Share)") +
+  ylab("Fail Rate") +
+  ggtitle("Micro Screen") 
+
+# Moisture
+moist <- fail_merge %>%
+  dplyr::left_join(lab_codes, by = c("lab_license" = "lab_id")) %>%
+  dplyr::left_join(lab_market_share, by = c("lab_license" = "Lab")) %>%
+  dplyr::filter(Test == "Moisture Content")
+
+moist_plot <-  ggplot(data=moist, mapping=aes(x=reorder(code, market_share), y=Fail.Rate)) + geom_bar(colour="black", fill= "purple", stat="identity") + ylim(0,0.10) +
+  xlab("Lab (Listed by Increaseing Market Share)") +
+  ylab("Fail Rate") +
+  ggtitle("Moisture Content") 
+
+grid.arrange(fm_plot, micro_plot, moist_plot, ncol = 3)
+```
+
+
+```{r, fig.width=4, fig.height=4, dpi=100, fig.align='center', message=FALSE, echo=FALSE}
+# Solvent
+solv <- fail_merge %>%
+  dplyr::left_join(lab_codes, by = c("lab_license" = "lab_id")) %>%
+  dplyr::left_join(lab_market_share, by = c("lab_license" = "Lab")) %>%
+  dplyr::filter(Test == "Solvent Screen") %>%
+  dplyr::filter(Fail.Rate < 0.50)
+
+ggplot(data=solv, mapping=aes(x=reorder(code, market_share), y=Fail.Rate)) + geom_bar(colour="black", fill= "orange", stat="identity") + ylim(0,0.30) +
+  xlab("Lab (Listed by Increaseing Market Share)") +
+  ylab("Fail Rate") +
+  ggtitle("Solvent Screen") 
+```
+
+## Fail Rates drop and stay low over time
+The legal marijuana market has grown rapidly since its opening in July 2014. At the start of the market, there were fewer labs and more have opened over time. The labs have had to adjust to the demands of the state and the producers as well as compete with one another for business. One of the critical factors on which labs compete is fail rate. Producers have complete liberty to choose where they send their samples. If a lab is not giving them the results they are hoping for, the producers have total freedom to choose another lab. The animation below illustrates how the fail rates have changed for each lab over time. Each ball represents a lab. Time is represented through the animation (monitoring the labs month by month). The horizontal axis measures the total number of tests processed, representing increasing market share. The vertical axis measures the monthly fail rate. Balls that move faster towards the right are gaining market share quickly. Labs that move slowly or do not move, do not process many tests.
+
+#### Labs to watch:
+-	Lab D: The monthly Fail Rate increases and decreases frequently. Gains market share at first then slows.
+-	Lab K & N: Slowly gain market share and surpass Lab 4.
+-	Lab C: Gains market share quickly and pulls ahead of the rest. Fail rate consistently below 5% of samples.
+-	Lab L: Initially gains market share then disappears. This lab was closed by the state.
+-	Lab J: Opens in late 2015 and quickly gains market share. Consistently low Fail Rate.
+
+
+```{r, message=FALSE, echo=FALSE}
+# Fail Rate for All Tests
+# fix the dates -----------------------------------------------
+# Convert to mdy
+fmt$date <- mdy(fmt$test_date)
+# Get month and year
+fmt$month <- month(as.POSIXlt(fmt$date, format="%d/%m/%Y"))
+# Get year
+fmt$year <- year(as.POSIXlt(fmt$date, format="%d/%m/%Y"))
+# Get month year
+fmt$month_Yr <- format(as.Date(fmt$date), "%Y-%m")
+
+all <- fmt %>%
+  dplyr::select(lab_id, Test, num_fail, total_tests, month_Yr) %>%
+  dplyr::arrange(month_Yr) %>%
+  dplyr::group_by(lab_id, month_Yr) %>%
+  dplyr::summarise(month_fail = sum(num_fail), month_tot = sum(total_tests)) %>% # Calculate the monthly fails
+  dplyr::mutate(mo_fail_rate = month_fail/month_tot) %>% # Calculate the monthly fail rate
+  dplyr::group_by(lab_id) %>%
+  dplyr::mutate(lab_tot = cumsum(month_tot)) %>% # Calculate the cumulative sum of samples received
+  dplyr::filter(month_tot > 200) %>% # limit to months that received > 200 samples
+  dplyr::left_join(lab_codes, by = "lab_id") # bring in lab codes to deidentify
+
+# Set fonts to text
+t <- list(
+  family = "arial black",
+  size = 18,
+  color = toRGB("black"))
+# Set X-axis
+x <- list(
+  title = 'Cumulative Number of Tests Processed'
+)
+# Set y-axis
+y <- list(
+  title = 'Monthly Fail Rate'
+)
+
+# Set up plot
+base <- all %>%
+  plot_ly(x = ~lab_tot, y = ~mo_fail_rate,  mode = "markers", # x=cumulative total y=monthly fail rate
+          text = ~code, hoverinfo = "text", # put text as lable on circles
+  marker = list(size = 40, # set color and size of circles
+              color = 'limegreen',
+              line = list(color = 'darkgreen',
+                          width = 2))) %>%
+  layout(title = 'Lab Fail Rate over Time',
+         yaxis = y,
+         xaxis = x) 
+
+base %>%
+  add_markers(frame = ~month_Yr, ids = ~code) %>% # include animation over time
+  animation_opts(1000, easing = "elastic", transition = 0) %>% # control speed of animation
+  animation_button(
+    x = 1, xanchor = "right", y = 0, yanchor = "bottom" # place the play button
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "Month & Year ", font = list(color="red")) # ad count to slider (not working) 
+  ) %>%
+  add_text(textfont = t, textposition = "center") %>%
+  hide_legend()
+
+```
+
+## There is an Initial Period of Fluxation before Labs Settle into a Pattern
+
+It appears that often when a new lab initially opens, there may be high fail rates that then come down over time. While this may in part be due to the newness of the legal market overall, when we look at the fail rate given the number of months a lab has been open as opposed to their fail rate over time that the market has been open, this spike appears to be more closely related to the lab opening than to the market opening.
+
+```{r fail_monthsopen, message=FALSE, echo=FALSE}
+# convert to dates
+fmt$test_date <- as.Date(fmt$test_date, format="%m/%d/%Y")
+# get month of the test for grouping
+fmt$month <- floor_date(fmt$test_date, "month")
+# connect codes
+fmt <- left_join(fmt, lab_codes, by="lab_id")
+
+byopen <- fmt %>%
+  dplyr::group_by(code) %>%
+  dplyr::mutate(months_open = as.numeric((month - min(month)) / 30)) %>%
+  dplyr::group_by(code, months_open) %>%
+  dplyr::summarise(failrate = sum(num_fail, na.rm=T) / sum(total_tests, na.rm=T)) %>%
+  dplyr::rename(Lab = code, `Months Open` = months_open, `Fail Rate` = failrate) %>%
+  ggplot(aes(x=`Months Open`, y=`Fail Rate`, group=`Lab`)) +
+  geom_line(color="darkseagreen") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title="Fail Rate by Months Open",
+       x="Months Open",
+       y="Fail Rate") + 
+  theme(panel.background = element_rect(fill = "white"))
+
+ggplotly(byopen)
+```
+
+```{r fail_overtime, message=FALSE, echo=FALSE}
+overtime <- fmt %>%
+  dplyr::group_by(code) %>%
+  dplyr::group_by(code, month) %>%
+  dplyr::summarise(failrate = sum(num_fail, na.rm=T) / sum(total_tests, na.rm=T)) %>%
+  dplyr::rename(Lab = code, Month = month, `Fail Rate` = failrate) %>%
+  ggplot(aes(x=Month, y=`Fail Rate`, group=`Lab`)) +
+  geom_line(color="darkseagreen") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title="Fail Rate by Time",
+       x="Date",
+       y="Fail Rate") + 
+  theme(panel.background = element_rect(fill = "white"))
+
+ggplotly(overtime)
+
+```
