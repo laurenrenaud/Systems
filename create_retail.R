@@ -117,16 +117,16 @@ inventory$parentid <- as.numeric(inventory$parentid)
 # also need to figure out how units / weights work in here
 
 
-retail <- retail %>%
+retail <- dispensing %>%
   # first going back to retailer's inventory
   dplyr::left_join(inventory, by="inventoryid") %>%
   # then getting potency
   #dplyr::left_join(potency_tidy, by="inventoryparentid") %>%
   # renaming and dropping variables
   dplyr::select(dispensingid, retail_loc = location.x, retail_price = price, retail_price_x = price_x,
-                retail_usableweight = usableweight.x,
+                retail_usableweight = usableweight.x, retail_prodname = productname,
                 retail_typename = inv_type_name.x, retail_inventoryid = inventoryid,
-                retail_parentid = parentid, retail_weight = weight.x, saledate = saletime,
+                retail_parentid = parentid, retail_weight = weight.x, saledate = monthtime,
                 retail_transactionid = transactionid.x, retail_deleted = deleted.x, refunded, 
                 retail_invtype = inventorytype.x, retail_invdate = inv_date)
 # same number of entries in retail than in dispensing at this point
@@ -159,9 +159,15 @@ retail <- retail %>%
   dplyr::left_join(trans.select, by=c("retail_inventoryid" = "trans_invid"))
 
 # correcting for useable weight & weight
-retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
-                               retail$retail_price_x / retail$retail_usableweight,
-                               retail$retail_price_x / retail$retail_weight)
+# retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
+#                                retail$retail_price_x / retail$retail_usableweight,
+#                                retail$retail_price_x / retail$retail_weight)
+retail$retailprice_weight <- ifelse(!is.na(retail$retail_weight),
+                               retail$retail_price_x / retail$retail_weight,
+                               NA)
+retail$retailprice_usableweight <- ifelse(!is.na(retail$retail_usableweight),
+                                          retail$retail_price_x / retail$retail_usableweight,
+                                          NA)
 
 # sampling for plotting, use smaller number for export
 retail.list <- sample(retail$dispensingid, 150000, replace=F)
@@ -169,6 +175,7 @@ retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
 write.table(retail.sample, file="../data/Dec2016/cleaned/testing/retailToTransfers.csv",
             sep=",", row.names = F)
 
+# sample usable marijuana
 usable <- filter(retail, retail_typename=="Usable Marijuana")
 samplelist <- sample(usable$dispensingid, 20000, replace=F)
 retail.sample.usable <- dplyr::filter(retail, dispensingid %in% samplelist)
