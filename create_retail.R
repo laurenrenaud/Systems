@@ -213,6 +213,22 @@ retail.sample %>%
   labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
        x="Processor's Unit Price",
        y="Retail Sale Unit Price")
+
+retail.sample %>%
+  filter(trans_unitprice < 50, retailprice_usableweight < 250, retailprice_usableweight > 0,
+         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+         retail_typename=="Usable Marijuana"
+  ) %>%
+  ggplot(aes(x=trans_unitprice, y=retailprice_usableweight)) +
+  geom_point(alpha=0.25, color="darkgreen") + 
+  geom_smooth(color="gold2", method = "lm") +
+  #facet_wrap("retail_typename") +
+  xlim(0, 55) + ylim(0, 55) +
+  labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana, retailprice_usableweight",
+       x="Processor's Unit Price",
+       y="Retail Sale Unit Price")
+
+
 # Extracts for Inhalation
 retail.sample %>%
   filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
