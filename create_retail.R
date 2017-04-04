@@ -142,10 +142,11 @@ retail <- retail %>%
 # there were some (3.5%) of dispensing IDs that came up duplicate on this join
 # it appears they have multiple transferIDs that are causing the problem
 # need to look into it further, but dropping them for now
-retail.id.check <- select(retail, dispensingid, retail_inventoryid)
-trans.id.check <- select(trans.select, trans_id, trans_invid)
-dupe.disID <- retail.id.check %>%
-  left_join(trans.id.check, by=c("retail_inventoryid" = "trans_invid")) %>%
+#retail.id.check <- select(retail, dispensingid, retail_inventoryid)
+#trans.id.check <- select(trans.select, trans_id, trans_invid)
+dupe.disID <- retail %>%
+  select(dispensingid, retail_inventoryid) %>%
+  left_join(select(trans.select, trans_id, trans_invid), by=c("retail_inventoryid" = "trans_invid")) %>%
   group_by(dispensingid) %>%
   summarise(count = n()) %>%
   filter(count > 1) #%>%
@@ -159,10 +160,41 @@ retail <- retail %>%
   # pull in transfers to get producer to retail prices (and locations)
   dplyr::left_join(trans.select, by=c("retail_inventoryid" = "trans_invid"))
 
+
+# converting variable types
+retail$trans_usableweight <- as.numeric(retail$trans_usableweight)
+
 # correcting for useable weight & weight
-retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
-                               retail$retail_price_x / retail$retail_usableweight,
-                               retail$retail_price_x / retail$retail_weight)
+# from Imane:
+# To get wholesale price per gram:
+# 1. if trans_usableweight != NA, divide trans_saleprice by Trans_weight then by trans_usable weight
+# 2. else, divide trans_saleprice by trans_weight then retail_usableweight then retail_weight
+# 
+# To get retail price per gram:
+#   divide retail_price_x by retail_usableweight
+
+# sampling
+retail.list <- sample(retail$dispensingid, 150000, replace=F)
+retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
+retail.sample <- retail.sample %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(
+    trans_pricepergram = ifelse(!is.na(trans_usableweight),
+                                # if usable_weight is not NA
+                                # then divide transfer sale price by transfer weight (which is quantity)
+                                # and then divide that by the transfer usable weight (which is the weight per item)
+                                trans_saleprice / trans_weight / trans_usableweight,
+                                # if usable_weight is NA
+                                # transfer sale price, divided by trans_weight (quantity sold to retailer)
+                                # then divide by the (retail usable_weight / retail_weight)
+                                trans_saleprice / trans_weight / retail_usableweight / retail_weight),
+    retail_pricepergram = retail_price_x / retail_usableweight
+  )
+
+#retail$retail_pricepergram <- retail$retail_price_x / retail$retail_usableweight
+# retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
+#                                retail$retail_price_x / retail$retail_usableweight,
+#                                retail$retail_price_x / retail$retail_weight)
 # retail$retailprice_weight <- ifelse(!is.na(retail$retail_weight),
 #                                retail$retail_price_x / retail$retail_weight,
 #                                NA)
@@ -170,134 +202,153 @@ retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
 #                                           retail$retail_price_x / retail$retail_usableweight,
 #                                           NA)
 
-# sampling for plotting, use smaller number for export
-retail.list <- sample(retail$dispensingid, 150000, replace=F)
-retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
+
 write.table(retail.sample, file="../data/Dec2016/cleaned/testing/retailToTransfers.csv",
             sep=",", row.names = F)
 
 # sample usable marijuana
-usable <- filter(retail, retail_typename=="Usable Marijuana")
+usable <- filter(retail.sample, retail_typename=="Usable Marijuana")
 samplelist <- sample(usable$dispensingid, 20000, replace=F)
 retail.sample.usable <- dplyr::filter(retail, dispensingid %in% samplelist)
-write.table(retail.sample.usable, file="../data/Dec2016/cleaned/testing/retailUsable.csv",
-            sep=",", row.names = F)
+# write.table(retail.sample.usable, file="../data/Dec2016/cleaned/testing/retailUsable.csv",
+#             sep=",", row.names = F)
 
-# plotting markups
+
+# plotting markups v2
 retail.sample %>%
-  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+  filter(trans_pricepergram < 50, retail_pricepergram < 250, retail_pricepergram > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Usable Marijuana" | retail_typename=="Marijuana Extract for Inhalation" |
            retail_typename=="Liquid Marijuana Infused Edible" | retail_typename=="Solid Marijuana Infused Edible"
-         ) %>%
-  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  ) %>%
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
   geom_point(alpha=0.25, color="darkgreen") + 
   geom_smooth(color="gold2", method="lm") +
   facet_wrap("retail_typename") +
   labs(title="Relationship Between Processor and Retail Prices",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram")
+
 
 # instead of facet wrap, diff one for each -----
 # Usable
 retail.sample %>%
-  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+  # switching from trans_unitprice and unitsaleprice to trans_pricepergram and retail_pricepergram
+  filter(trans_pricepergram < 50, retail_pricepergram < 250, retail_pricepergram > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Usable Marijuana"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
   geom_point(alpha=0.25, color="darkgreen") + 
   geom_smooth(color="gold2", method = "lm") +
   #facet_wrap("retail_typename") +
-  xlim(0, 55) + ylim(0, 55) +
+  xlim(0, 125) + ylim(0, 125) +
   labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram")
 
 retail.sample %>%
-  filter(trans_unitprice < 50, retailprice_usableweight < 250, retailprice_usableweight > 0,
+  # switching from trans_unitprice and unitsaleprice to trans_pricepergram and retail_pricepergram
+  filter(#trans_pricepergram < 50, retail_pricepergram < 250, retail_pricepergram > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Usable Marijuana"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=retailprice_usableweight)) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
   geom_point(alpha=0.25, color="darkgreen") + 
   geom_smooth(color="gold2", method = "lm") +
   #facet_wrap("retail_typename") +
-  xlim(0, 55) + ylim(0, 55) +
-  labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana, retailprice_usableweight",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
+  xlim(0, 60) + ylim(0, 60) +
+  labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram")
+ 
+# retail.sample %>%
+#   filter(trans_unitprice < 50, retailprice_usableweight < 250, retailprice_usableweight > 0,
+#          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+#          retail_typename=="Usable Marijuana"
+#   ) %>%
+#   ggplot(aes(x=trans_unitprice, y=retailprice_usableweight)) +
+#   geom_point(alpha=0.25, color="darkgreen") + 
+#   geom_smooth(color="gold2", method = "lm") +
+#   #facet_wrap("retail_typename") +
+#   xlim(0, 55) + ylim(0, 55) +
+#   labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana, retailprice_usableweight",
+#        x="Processor's Unit Price",
+#        y="Retail Sale Unit Price")
 
 
 # Extracts for Inhalation
 retail.sample %>%
-  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+  # switching from trans_unitprice and unitsaleprice to trans_pricepergram and retail_pricepergram
+  filter(#trans_pricepergram < 50, retail_pricepergram < 250, retail_pricepergram > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Marijuana Extract for Inhalation"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
   geom_point(alpha=0.25, color="darkgreen") + 
   geom_smooth(color="gold2", method="lm") +
   xlim(0, 250) + ylim(0, 250) +
   #facet_wrap("retail_typename") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram")
+
 # Extracts for Inhalation USING retailprice_weight
-retail.sample %>%
-  filter(trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
-         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
-         retail_typename=="Marijuana Extract for Inhalation"
-  ) %>%
-  ggplot(aes(x=trans_unitprice, y=retailprice_weight)) +
-  geom_point(alpha=0.25, color="darkgreen") + 
-  geom_smooth(color="gold2", method="lm") +
-  xlim(0, 120) + ylim(0, 120) +
-  #facet_wrap("retail_typename") +
-  labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, retailprice_weight",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
-# Extracts for Inhalation USING retailprice_usableweight
-retail.sample %>%
-  filter(trans_unitprice < 50, retailprice_usableweight < 250, retailprice_usableweight > 0,
-         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
-         retail_typename=="Marijuana Extract for Inhalation"
-  ) %>%
-  ggplot(aes(x=trans_unitprice, y=retailprice_usableweight)) +
-  geom_point(alpha=0.25, color="darkgreen") + 
-  geom_smooth(color="gold2", method="lm") +
-  xlim(0, 250) + ylim(0, 250) +
-  #facet_wrap("retail_typename") +
-  labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, retailprice_usableweight",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
+# retail.sample %>%
+#   filter(trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
+#          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+#          retail_typename=="Marijuana Extract for Inhalation"
+#   ) %>%
+#   ggplot(aes(x=trans_unitprice, y=retailprice_weight)) +
+#   geom_point(alpha=0.25, color="darkgreen") + 
+#   geom_smooth(color="gold2", method="lm") +
+#   xlim(0, 120) + ylim(0, 120) +
+#   #facet_wrap("retail_typename") +
+#   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, retailprice_weight",
+#        x="Processor's Unit Price",
+#        y="Retail Sale Unit Price")
+# # Extracts for Inhalation USING retailprice_usableweight
+# retail.sample %>%
+#   filter(trans_unitprice < 50, retailprice_usableweight < 250, retailprice_usableweight > 0,
+#          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
+#          retail_typename=="Marijuana Extract for Inhalation"
+#   ) %>%
+#   ggplot(aes(x=trans_unitprice, y=retailprice_usableweight)) +
+#   geom_point(alpha=0.25, color="darkgreen") + 
+#   geom_smooth(color="gold2", method="lm") +
+#   xlim(0, 250) + ylim(0, 250) +
+#   #facet_wrap("retail_typename") +
+#   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, retailprice_usableweight",
+#        x="Processor's Unit Price",
+#        y="Retail Sale Unit Price")
 # Liquid edible
 retail.sample %>%
-  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+  filter(#trans_pricepergram < 50, retail_pricepergram < 250, retail_pricepergram > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Liquid Marijuana Infused Edible"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
   geom_point(alpha=0.25, color="darkgreen") + 
   geom_smooth(color="gold2", method="lm") +
-  xlim(0, 65) + ylim(0, 65) +
+  #xlim(0, 65) + ylim(0, 65) +
   #facet_wrap("retail_typename") +
   labs(title="Relationship Between Processor and Retail Prices \nLiquid Marijuana Infused Edible",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram")
+
 # Solid edible
 retail.sample %>%
-  filter(trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
+  filter(#trans_unitprice < 50, unitsaleprice < 250, unitsaleprice > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Solid Marijuana Infused Edible"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=unitsaleprice)) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
   geom_point(alpha=0.25, color="darkgreen") + 
   geom_smooth(color="gold2", method="lm") +
   xlim(0, 65) + ylim(0, 65) +
   labs(title="Relationship Between Processor and Retail Prices \nSolid Marijuana Infused Edible",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price")
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram")
 
 # trying same with colors for inhalant classifications
 # first get list/df of inhalantnames
@@ -314,7 +365,7 @@ inhalantnames <- inhalantnames %>%
                 method = ifelse(grepl("BHO|butane", retail_prodname, ignore.case = T), "BHO",
                                 ifelse(grepl("CO2", retail_prodname, ignore.case = T), "CO2",
                                        "unknown"
-                         )),
+                                )),
                 # type
                 type = ifelse(grepl("hash", retail_prodname, ignore.case=T), "hash",
                               ifelse(grepl("kief|keif", retail_prodname, ignore.case = T), "kief",
@@ -331,70 +382,66 @@ retail.sample <- left_join(retail.sample, inhalantnames, by="retail_prodname")
 
 # Extracts -- is cartridge
 retail.sample %>%
-  filter(trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
+  filter(#trans_pricepergram < 50, retail_pricepergram < 250, retail_pricepergram > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Marijuana Extract for Inhalation"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=retailprice_weight, color=cartridge)) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram, color=cartridge)) +
   geom_point(aes(color=cartridge), alpha=0.35) + 
   geom_smooth(color="gold2", method="lm") +
-  xlim(0, 120) + ylim(0, 120) +
+  scale_colour_brewer(palette = "Set2") +
+  xlim(0, 250) + ylim(0, 250) +
   #facet_wrap("retail_typename") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, By If Cartridge",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price") +
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram") +
   theme(legend.position = c(.8, .5))
 
 # Extracts -- extraction method
 retail.sample %>%
-  filter(trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
+  filter(#trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Marijuana Extract for Inhalation", method!="unknown"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=retailprice_weight, color=method)) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram, color=method)) +
   geom_point(aes(color=method), alpha=0.4) + 
-  scale_colour_brewer(palette = "Dark2") +
+  scale_colour_brewer(palette = "Set2") +
   geom_smooth(color="gold2", method="lm") +
-  xlim(0, 80) + ylim(0, 80) +
+  xlim(0, 200) + ylim(0, 200) +
   #facet_wrap("retail_typename") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, By Extraction Method",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price") +
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram") +
   theme(legend.position = c(.8, .5))
 
 # Extracts -- type
 retail.sample %>%
-  filter(trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
+  filter(#trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
          retail_typename=="Marijuana Extract for Inhalation", type!="unknown"
   ) %>%
-  ggplot(aes(x=trans_unitprice, y=retailprice_weight, color=type)) +
-  geom_point(aes(color=type), alpha=0.6, size=3) +
+  ggplot(aes(x=trans_pricepergram, y=retail_pricepergram, color=type)) +
+  geom_point(aes(color=type), alpha=0.4, size=2) +
   scale_colour_brewer(palette = "Set1") +
   geom_smooth(color="gold2", method="lm") +
-  xlim(0, 30) + ylim(0, 80) +
+  xlim(0, 120) + ylim(0, 120) +
   #facet_wrap("retail_typename") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, By Type",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price") +
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram") +
   theme(legend.position = c(.8, .5))
-retail.sample %>%
-  filter(trans_unitprice < 50, retailprice_weight < 250, retailprice_weight > 0,
-         #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
-         retail_typename=="Marijuana Extract for Inhalation", type!="unknown"
-  ) %>%
-  ggplot(aes(x=trans_unitprice, y=retailprice_weight, color=type)) +
-  geom_point(aes(color=type), alpha=0.6, size=3) +
-  scale_colour_brewer(palette = "Set1") +
-  geom_smooth(color="gold2", method="lm") +
-  xlim(0, 60) + ylim(0, 60) +
-  facet_wrap("type") +
-  #facet_wrap("retail_typename") +
-  labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, By Type",
-       x="Processor's Unit Price",
-       y="Retail Sale Unit Price") +
-  theme(legend.position = c(.8, .2))
 
+# examine producer > retail ---------
+unusual_prices <- retail %>%
+  filter(retailprice_usableweight < trans_unitprice) %>%
+  select(dispensingid, retail_price_x, retail_usableweight, retail_weight, retail_prodname, retail_strain,
+         retailprice_weight, retailprice_usableweight,
+         retail_typename, trans_weight, trans_usableweight, trans_strain, trans_saleprice, trans_unitprice)
+# sample for examining
+samplelist <- sample(unusual_prices$dispensingid, 15000, replace=F)
+unusual.sample <- dplyr::filter(unusual_prices, dispensingid %in% samplelist)
+write.table(unusual.sample, file="../data/Dec2016/cleaned/testing/unusual_prices.csv",
+            sep=",", row.names = F)
 
 
 
