@@ -180,14 +180,21 @@ retail.sample <- retail.sample %>%
   dplyr::rowwise() %>%
   dplyr::mutate(
     trans_pricepergram = ifelse(!is.na(trans_usableweight),
-                                # if usable_weight is not NA
+                                # if transfer usable_weight is not NA
                                 # then divide transfer sale price by transfer weight (which is quantity)
                                 # and then divide that by the transfer usable weight (which is the weight per item)
                                 trans_saleprice / trans_weight / trans_usableweight,
-                                # if usable_weight is NA
+                                # if transfer usable_weight is NA
                                 # transfer sale price, divided by trans_weight (quantity sold to retailer)
+                                # to get price per single item
+                                # but we don't know if one item in transfers and retail mean the same thing
+                                # if retailer sells a four pack -- was that counted as weight of 1 in transfers, or weight of 4?
+                                # retail usable_weight already sums up total weight for given number of items packaged together
+                                # so we need to divide retail usableweight by retail weight to get the usable weight of single itme
+                                # then we can divide the transfer price per one item (trans_saleprice / trans_weight)
+                                # by the retail weight of one item (retail_usableweight / retail_weight)
                                 # then divide by the (retail usable_weight / retail_weight)
-                                trans_saleprice / trans_weight / retail_usableweight / retail_weight),
+                                (trans_saleprice / trans_weight) / (retail_usableweight / retail_weight)),
     retail_pricepergram = retail_price_x / retail_usableweight
   )
 
