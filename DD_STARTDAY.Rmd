@@ -1,0 +1,651 @@
+---
+title: "DD_Start_Day_of_Fall"
+author: "Yutian Guo"
+date: "April 3, 2017"
+output: html_document
+---
+
+
+---
+title: "Difference in Differences Pullman Clusten"
+author: "Yutian Guo"
+date: "March 3, 2017"
+output: html_document
+---
+
+
+
+############ Library #################
+```{r setup, include=FALSE}
+library(ggplot2)
+library(MASS)
+library(caret)
+library(knitr)
+library(dplyr)
+library(plyr)
+library(data.table) 
+library(reshape2)
+library(lubridate) #date-time stuff
+library(splines)
+library(hexbin) #geom_hexbin
+library(broom)
+library(foreign)
+
+
+
+```
+
+
+
+
+############ Load Data ###############
+
+```{r,cache=TRUE}
+# pullman
+pm <- read.csv("../data/NaturalExp_PM.csv",header = TRUE)
+# Clarkston
+ct <- read.csv("../data/NaturalExp_CT.csv",header = TRUE)
+# Kittitas
+#kitt<- read.csv("NaturalExp_KITT.csv",header = TRUE)
+# Wallawalla
+#walla <- read.csv("NaturalExp_WALLA.csv",header = TRUE)
+
+
+
+
+```
+
+
+Color Schema
+
+```{r, include=FALSE }
+
+
+
+# The palette with black:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# To use for fills, add
+scale_fill_manual(values=cbPalette)
+
+# To use for line and point colors, add
+scale_colour_manual(values=cbPalette)
+
+```
+
+
+# Pre-Processing
+```{r}
+# Preprocessing
+
+pm$date<-as.Date(pm$date)
+ct$date<-as.Date(ct$date)
+#kitt$date<-as.Date(kitt$date)
+#walla$date<-as.Date(walla$date) 
+
+# Add group number to two df; 0 - control group; 1 - experiment group
+ct$treated <- rep(0,nrow(ct))
+pm$treated <- rep(1,nrow(pm))
+#kitt$treated<-rep(1,nrow(kitt))
+#walla$treated<-rep(1,nrow(walla))
+
+# Select useful columns
+
+ct_selected<-ct%>%
+  dplyr::select(date,trans,adj.daily.trans,revenue,
+                adj.daily.revenue,perstore_dailytrans,
+                perstore_dailyRev,adj.perstore.dailyRev,
+                adj.perstore.dailytrans,treated)
+
+pm_selected<-pm%>%
+  dplyr::select(date,trans,adj.daily.trans,revenue,
+                adj.daily.revenue,perstore_dailytrans, 
+                perstore_dailyRev,adj.perstore.dailyRev, 
+                adj.perstore.dailytrans,treated)
+
+# kitt_selected<-kitt%>%
+#   dplyr::select(date,trans,adj.daily.trans,revenue,
+#                 adj.daily.revenue,perstore_dailytrans, 
+#                 perstore_dailyRev,adj.perstore.dailyRev, 
+#                 adj.perstore.dailytrans,treated)
+# 
+# walla_selected<-walla%>%
+#   dplyr::select(date,trans,adj.daily.trans,revenue,
+#                 adj.daily.revenue,perstore_dailytrans, 
+#                 perstore_dailyRev,adj.perstore.dailyRev, 
+#                 adj.perstore.dailytrans,treated)
+```
+
+# Control city : clarkston
+num of store in ct is constantly 2 during this period
+
+
+
+# Pullman
+1. Population in Pullman: 31,682 (2014 census)
+2. Washington State University (WSU) - 19,756 students at Pullman Campus
+3. Stores:
+   num of store in pm is 2 from 2016-3-1 to 2016-4-29, 3 from 2016-4-30 to 2016-7-19, 4 since 2016-7-20 
+
+
+## Treatment 1 start of school (Monday, August 22, 2016)
+```{r}
+# end of spring : Friday, May 6, 2016
+# The first day of instruction for the term.	Monday, August 22, 2016
+# Final examinations end.	Friday, December 16, 2016
+
+
+# Create a dummy variable when fall semester started.(Monday, August 22, 2016 )
+ct_selected_2<-ct_selected
+pm_selected_2<-pm_selected
+ct_selected_2$T2_fallStart <-ifelse(ct_selected_2$date >= "2016-08-22", 1, 0)
+pm_selected_2$T2_fallStart<-ifelse(pm_selected_2$date >= "2016-08-22", 1, 0)
+
+# extract 2 month before and after 
+pm_fall<-pm_selected_2[which(pm_selected_2$date>='2016-6-23'&pm_selected_2$date<'2016-10-22'),]
+ct_fall<-ct_selected_2[which(ct_selected_2$date>='2016-6-23'&ct_selected_2$date<'2016-10-22'),]
+
+# combine these two df into one
+ct_pm_treat2<-rbind(ct_fall,pm_fall)
+
+
+
+
+
+
+# Create an interaction between time and treated. We will call this interaction ??did??.
+ct_pm_treat2$did_T2_fallStart = ct_pm_treat2$T2_fallStart * ct_pm_treat2$treated
+```
+
+
+## Pullman and Clarkston: Revenue and Transactions in Year 2016 
+
+
+```{r}
+
+ct2016 <- subset(ct_selected_2,date > '2016-1-1')
+pm2016<- subset(pm_selected_2,date > '2016-1-1')
+ct2016$rev_trans_ratio <- ct2016$adj.daily.revenue/ct2016$adj.daily.trans
+pm2016$rev_trans_ratio <- pm2016$adj.daily.revenue/pm2016$adj.daily.trans
+
+# "2015 - 2016?? Transactions: Clarkston vs Pullman"
+ggplot()+
+  geom_point(data=ct_selected_2,mapping = aes(x=date,y=trans),color ="#56B4E9" )+
+  geom_smooth(data=ct_selected_2,mapping = aes(x=date,y=trans),method = 'lm',formula = y~ns(x, df=3),color = "#0072B2")+
+  geom_point(data=pm_selected_2,mapping = aes(x=date,y=trans),color ="#F0E442" )+
+  geom_smooth(data=pm_selected_2,mapping = aes(x=date,y=trans),method = 'lm',formula = y~ns(x, df=3),color =  "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  labs(title="2015 - 2016?? Transactions: Clarkston vs Pullman",
+       x = 'Date', y = 'Daily total transactions')
+
+
+# 2016 Transactions: Clarkston vs Pullman
+ggplot()+
+  geom_point(data=ct2016,mapping = aes(x=date,y=trans),color ="#56B4E9" )+
+  geom_smooth(data=ct2016,mapping = aes(x=date,y=trans),method = 'lm',formula = y~ns(x, df=3),color = "#0072B2")+
+  geom_point(data=pm2016,mapping = aes(x=date,y=trans),color ="#F0E442" )+
+  geom_smooth(data=pm2016,mapping = aes(x=date,y=trans),method = 'lm',formula = y~ns(x, df=3),color =  "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  labs(title="2016 Transactions: Clarkston vs Pullman",
+       x = 'Date', y = 'Daily total transactions')
+
+
+
+
+#"2016 Transactions (Seasonal Adjusted): Clarkston vs Pullman"
+ggplot()+
+  geom_point(data=ct2016,mapping = aes(x=date,y=adj.daily.trans),color ="#56B4E9" )+
+  # geom_smooth(data=ct2016,mapping = aes(x=date,y=adj.daily.trans),method = 'lm',formula = y~ns(x, df=3),color = "#0072B2")+
+  geom_point(data=pm2016,mapping = aes(x=date,y=adj.daily.trans),color ="#F0E442" )+
+  # geom_smooth(data=pm2016,mapping = aes(x=date,y=adj.daily.trans),
+  #             method = 'lm',formula = y~ns(x, df=3),color =  "#CC79A7") +
+  geom_smooth(data=subset(pm2016, date <= "2016-05-05"),mapping = aes(x=date,y=adj.daily.trans),
+              method = 'lm',formula = y~ns(x, df=1),color =  "#CC79A7") +
+  geom_smooth(data=subset(pm2016, date >= "2016-05-05" & date <= "2016-08-22"),
+              mapping = aes(x=date,y=adj.daily.trans), 
+              method = 'lm',formula = y~ns(x, df=1),color =  "#CC79A7") +
+  geom_smooth(data=subset(pm2016, date >= "2016-08-22"),
+              mapping = aes(x=date,y=adj.daily.trans), 
+              method = 'lm',formula = y~ns(x, df=1),color =  "#CC79A7") +
+  
+  geom_smooth(data=subset(ct2016, date <= "2016-05-05"),mapping = aes(x=date,y=adj.daily.trans),
+              method = 'lm',formula = y~ns(x, df=1),color =  "#0072B2") +
+  geom_smooth(data=subset(ct2016, date >= "2016-05-05" & date <= "2016-08-22"),
+              mapping = aes(x=date,y=adj.daily.trans), 
+              method = 'lm',formula = y~ns(x, df=1),color =  "#0072B2") +
+  geom_smooth(data=subset(ct2016, date >= "2016-08-22"),
+              mapping = aes(x=date,y=adj.daily.trans), 
+              method = 'lm',formula = y~ns(x, df=1),color =  "#0072B2") +
+  
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  labs(title="2016 Transactions (Seasonal Adjusted): Clarkston vs Pullman",
+       x = 'Date', y = 'Daily total transactions')
+
+```
+
+
+
+??
+# Treatment 2 spring end
+```{r}
+# combine these two df into one
+ct_pm_treat1<-rbind(ct_selected,pm_selected)
+
+# Create a dummy variable to indicate the time when the treatment started.(Friday, May 6, 2016 as the experiment )
+ct_pm_treat1$T1_springEnd <-ifelse(ct_pm_treat1$date >= "2016-05-06", 1, 0)
+
+
+# extract 2 month before and after 
+ct_pm_treat1<-ct_pm_treat1[which(ct_pm_treat1$date>='2016-3-1'&ct_pm_treat1$date<'2016-7-30'),]
+
+
+# Create an interaction between time and treated. We will call this interaction ??did??.
+ct_pm_treat1$did_T1_springEnd = ct_pm_treat1$T1_springEnd * ct_pm_treat1$treated
+
+
+# 2016 'Spring and Summer Transactions(Seasonal Adjusted): pullman vs Clarkston'
+ggplot(data = ct_pm_treat1,
+       mapping= aes(x=date,y=adj.daily.trans,color= as.factor(treated),
+                    linetype = as.factor(treated)))+
+  geom_point()+
+  # geom_smooth(method='lm', formula = y~ns(x, df=3))+
+  geom_smooth(data=subset(ct_pm_treat1, date >= "2016-05-06"),
+              mapping = aes(x=date,y=adj.daily.trans), 
+              method = 'lm',formula = y~ns(x, df=1),color =  "#0072B2") +
+  geom_smooth(data=subset(ct_pm_treat1, date <= "2016-05-06"),
+              mapping = aes(x=date,y=adj.daily.trans), 
+              method = 'lm',formula = y~ns(x, df=1),color =  "#0072B2") +
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  scale_linetype_discrete(name="City", 
+                          breaks=c("0", "1"), 
+                          labels = c("Clarkston", "Pullman"))+
+   scale_colour_manual(values=cbPalette)+
+  labs(title='Spring and Summer Transactions(Seasonal Adjusted): pullman vs Clarkston')
+
+
+
+# DD Reg
+didreg_adjTOTtrans_treat1 = lm(adj.daily.trans~treated+T1_springEnd+did_T1_springEnd, data = ct_pm_treat1)
+summary(didreg_adjTOTtrans_treat1)
+
+
+```
+
+
+#######################################################
+###y = total transaction,  Estimating the DID estimator 
+#######################################################
+```{r}
+# view plot 
+# Summer and Fall Transactions(Seasonal Adjusted): pullman vs Clarkston
+ggplot(data = ct_pm_treat2,
+       mapping= aes(x=date,y=adj.daily.trans,color= as.factor(treated),
+                    linetype = as.factor(treated)))+
+  geom_point()+
+  geom_smooth(method='lm', formula = y~ns(x, df=3))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  scale_linetype_discrete(name="City", 
+                          breaks=c("0", "1"), 
+                          labels = c("Clarkston", "Pullman"))+
+   scale_colour_manual(values=cbPalette)+
+  labs(title='Summer and Fall Transactions(Seasonal Adjusted): pullman vs Clarkston') 
+    
+
+
+
+# d-in-d regression
+didreg_TOTtrans_treat2 = lm(trans~treated+T2_fallStart+did_T2_fallStart, data = ct_pm_treat2)
+summary(didreg_TOTtrans_treat2)
+# use seasonal adjusted
+didreg_adjTOTtrans_treat2 = lm(adj.daily.trans~treated+T2_fallStart+did_T2_fallStart, data = ct_pm_treat2)
+summary(didreg_adjTOTtrans_treat2)
+```
+________________________________________________________________________________________
+conclusion:  *********************important
+The coefficient for ??did_fall_start?? is the differences-in-differences estimator. The effect is significant at 0.000 level with the treatment having a positive effect.
+________________________________________________________________________________________
+
+## Conclusion Summary for Treatment 2
+For treatment 2 fall_start, seasonal adjusted data performs better than not adjusted. And total data makes more sense than persotre data.
+According to above results, the coefficient for ??did_fall_start?? is the differences-in-differences estimator. 
+In terms of total transactions, The effect is significant at 0.000 level with the treatment having a positive effect.
+
+lm(formula = adj.daily.trans ~ treated + T2_fallStart + did_T2_fallStart, 
+    data = ct_pm_treat2)
+                     Estimate    Std. Error t value Pr(>|t|)  
+  did_T2_fallStart   316.91      49.95      6.344   6.79e-10 ***
+  
+ 
+ 
+ 
+Part II D-IN-D Regression By Product Type at Pullman City
+
+Usable marijuana; extracts for inhalation; and edibles
+
+```{r}
+
+pm.pdct <- read.csv("NaturalExp_PM_product.csv", header = TRUE)
+ct.pdct <- read.csv("NaturalExp_CT_product.csv", header = TRUE)
+
+ct.pdct$treat <- rep(0, nrow(ct.pdct))
+pm.pdct$treat <- rep(1, nrow(pm.pdct))
+
+pm.pdct$date<-as.Date(pm.pdct$date)
+ct.pdct$date<-as.Date(ct.pdct$date)
+
+pm.pdct$edible <- rowSums(pm.pdct[,c("solid_edible", "liquid_edible")])
+ct.pdct$edible <- rowSums(ct.pdct[,c("solid_edible", "liquid_edible")])
+
+ct.pd2016<-subset(ct.pdct,date>'2016-1-1')
+pm.pd2016<-subset(pm.pdct,date>'2016-1-1')
+
+pm.4month<-pm.pd2016[which(pm.pd2016$date>='2016-6-22'&pm.pd2016$date<'2016-10-22'),]
+ct.4month<-ct.pd2016[which(ct.pd2016$date>='2016-6-22'&ct.pd2016$date<'2016-10-22'),]
+```
+
+# Edible
+```{r}
+
+ggplot()+
+  geom_point(data = ct.pd2016, mapping= aes(x=date,y=edible),color= "#56B4E9")+
+  geom_smooth(data = ct.pd2016, mapping = aes(x=date,y=edible),
+              method='lm', formula = y~ns(x, df=4),color = "#0072B2")+
+  geom_point(data=pm.pd2016,mapping=aes(x=date,y=edible),color ="#F0E442")+
+  geom_smooth(data=pm.pd2016, mapping = aes(x=date,y=edible),
+              method='lm', formula = y~ns(x, df=4), color = "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+    labs(title='Edible Transactions % : pullman vs Clarkston') 
+
+ggplot()+
+  geom_point(data = ct.4month, mapping= aes(x=date,y=edible),color= "#56B4E9")+
+  geom_smooth(data = ct.4month, mapping = aes(x=date,y=edible),
+              method='lm', formula = y~ns(x, df=4),color = "#0072B2")+
+  geom_point(data=pm.4month,mapping=aes(x=date,y=edible),color ="#F0E442")+
+  geom_smooth(data=pm.4month, mapping = aes(x=date,y=edible),
+              method='lm', formula = y~ns(x, df=4), color = "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+    labs(title='Edible Transactions % (Jun. - Oct.): pullman vs Clarkston') 
+```
+
+
+
+# Extract
+```{r}
+
+ggplot()+
+  geom_point(data = ct.pd2016, mapping= aes(x=date,y=extract),color= "#56B4E9")+
+  geom_smooth(data = ct.pd2016, mapping = aes(x=date,y=extract),
+              method='lm', formula = y~ns(x, df=5),color = "#0072B2")+
+  geom_point(data=pm.pd2016,mapping=aes(x=date,y=extract),color ="#F0E442")+
+  geom_smooth(data=pm.pd2016, mapping = aes(x=date,y=extract),
+              method='lm', formula = y~ns(x, df=5), color = "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+    labs(title='Extract Transactions % : pullman vs Clarkston') 
+
+
+ggplot()+
+  geom_point(data = ct.4month, mapping= aes(x=date,y=extract),color= "#56B4E9")+
+  geom_smooth(data = ct.4month, mapping = aes(x=date,y=extract),
+              method='lm', formula = y~ns(x, df=3),color = "#0072B2")+
+  geom_point(data=pm.4month,mapping=aes(x=date,y=extract),color ="#F0E442")+
+  geom_smooth(data=pm.4month, mapping = aes(x=date,y=extract),
+              method='lm', formula = y~ns(x, df=3), color = "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+    labs(title='Extract Transactions % (Jun. - Oct.): pullman vs Clarkston') 
+```
+
+
+# Nicer Version of Product Mix
+
+```{r}
+# plot pullman
+
+pmct.pdct <- rbind(pm.pdct[,c("date", "usable", "extract", "solid_edible", "liquid_edible", "treat")], ct.pdct[,c("date", "usable", "extract", "solid_edible", "liquid_edible", "treat")])
+pmct.pdct$edible <- rowSums(pmct.pdct[,c("solid_edible", "liquid_edible")])
+
+pmct.pdct.graph<-pmct.pdct%>%
+  dplyr::select(1,2,3,7,6)%>%
+  dplyr::filter(date>'2016-1-1')%>%
+  tidyr::gather(usable,extract,edible, key = "Inv_Type", value = "Proportion")
+
+pm.graph <- subset(pmct.pdct.graph,treat == 1)
+ct.graph <- subset(pmct.pdct.graph,treat == 0)
+
+
+pmct.pdct.graph2<-pmct.pdct%>%
+  dplyr::select(1,3,7,6)%>%
+  dplyr::filter(date>'2016-1-1')%>%
+  tidyr::gather(extract,edible, key = "Inv_Type", value = "Proportion")
+
+pm.graph2 <- subset(pmct.pdct.graph2,treat == 1)
+ct.graph2 <- subset(pmct.pdct.graph2,treat == 0)
+
+ggplot(data = pmct.pdct.graph, 
+              mapping= aes(x=date,y=Proportion,color=Inv_Type,
+                           linetype = as.factor(treat)))+
+  geom_smooth(method='lm', formula = y~ns(x, df=3))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  scale_linetype_discrete(name="City", 
+                          breaks=c("0", "1"), 
+                          labels = c("Clarkston", "Pullman"))+
+   scale_colour_manual(values=cbPalette)+
+    labs(title='Pullman vs Clarkston product mix 2016') 
+
+ggplot(data = pmct.pdct.graph2, 
+              mapping= aes(x=date,y=Proportion,color=Inv_Type,
+                           linetype = as.factor(treat)))+
+  geom_smooth(method='lm', formula = y~ns(x, df=3))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  scale_linetype_discrete(name="City", 
+                          breaks=c("0", "1"), 
+                          labels = c("Clarkston", "Pullman"))+
+   scale_colour_manual(values=cbPalette)+
+    labs(title='Pullman vs Clarkston extract and edible ratio 2016') 
+
+ggplot()+
+  geom_smooth(data = ct.graph, mapping= aes(x=date,y=Proportion,color=Inv_Type),method='lm', formula = y~ns(x, df=10))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+    labs(title='Clarkston product mix 2016') 
+```
+
+
+############### may not need 
+```{r}
+
+ggplot(data = pm.graph2, mapping= aes(x=date,y=Proportion,color=Inv_Type))+
+  geom_point()+
+  geom_smooth(data = pm.graph2, mapping= aes(x=date,y=Proportion,color=Inv_Type),method='lm', formula = y~ns(x, df=4))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+    labs(title='Pullman product mix 2016') 
+
+ggplot(data = ct.graph2, mapping= aes(x=date,y=Proportion,color=Inv_Type))+
+  geom_point()+
+  geom_smooth(data = pm.graph2, mapping= aes(x=date,y=Proportion,color=Inv_Type),method='lm', formula = y~ns(x, df=4))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+    labs(title='Clarkston product mix 2016') 
+
+
+
+
+
+```
+
+ 
+  
+
+##### Rev Graphs #####
+
+```{r}
+# Rev
+
+ggplot()+
+  geom_point(data=ct2016,mapping = aes(x=date,y=revenue),color ="#56B4E9" )+
+  geom_smooth(data=ct2016,mapping = aes(x=date,y=revenue),method = 'lm',formula = y~ns(x, df=4),color = "#0072B2")+
+  geom_point(data=pm2016,mapping = aes(x=date,y=revenue),color ="#F0E442" )+
+  geom_smooth(data=pm2016,mapping = aes(x=date,y=revenue),method = 'lm',formula = y~ns(x, df=4),color =  "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  labs(title="2016 Revenue: Clarkston vs Pullman",x = 'Date', y = 'Daily total revenue')
+```
+
+
+
+```{r}
+ggplot()+
+  geom_point(data=ct2016,mapping = aes(x=date,y=adj.daily.revenue),color ="#56B4E9" )+
+  geom_smooth(data=ct2016,mapping = aes(x=date,y=adj.daily.revenue),method = 'lm',formula = y~ns(x, df=4),color = "#0072B2")+
+  geom_point(data=pm2016,mapping = aes(x=date,y=adj.daily.revenue),color ="#F0E442" )+
+  geom_smooth(data=pm2016,mapping = aes(x=date,y=adj.daily.revenue),method = 'lm',formula = y~ns(x, df=4),color =  "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  labs(title="2016 Revenue (Seasonal Adjusted) : Clarkston vs Pullman",x = 'Date', y = 'Daily total revenue')
+```
+
+
+
+```{r}
+ggplot()+
+  geom_point(data=ct_selected_2,mapping = aes(x=date,y=adj.daily.revenue),color ="#56B4E9" )+
+  geom_smooth(data=ct_selected_2,mapping = aes(x=date,y=adj.daily.revenue),method = 'lm',formula = y~ns(x, df=4),color = "#0072B2")+
+  geom_point(data=pm_selected_2,mapping = aes(x=date,y=adj.daily.revenue),color ="#F0E442" )+
+  geom_smooth(data=pm_selected_2,mapping = aes(x=date,y=adj.daily.revenue),method = 'lm',formula = y~ns(x, df=4),color =  "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  labs(title="2015-2016 Revenue (Seasonal Adjusted) : Clarkston vs Pullman",x = 'Date', y = 'Daily total revenue')
+
+
+# Ratio
+
+ggplot()+
+  geom_point(data=ct2016,mapping = aes(x=date,y=rev_trans_ratio),color ="#56B4E9" )+
+  geom_smooth(data=ct2016,mapping = aes(x=date,y=rev_trans_ratio),method = 'lm',formula = y~ns(x, df=4),color = "#0072B2")+
+  geom_point(data=pm2016,mapping = aes(x=date,y=rev_trans_ratio),color ="#F0E442" )+
+  geom_smooth(data=pm2016,mapping = aes(x=date,y=rev_trans_ratio),method = 'lm',formula = y~ns(x, df=4),color =  "#CC79A7")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  labs(title="2016 Ratio (Seasonal Adjusted) : Clarkston vs Pullman",x = 'Date', y = 'Rev/trans')
+
+
+
+```
+
+
+
+
+########################################################
+#y = total rev, Estimating the DID estimator 
+#######################################################
+```{r}
+# view plot
+ggplot(data = ct_pm_treat2,
+       mapping= aes(x=date,y=adj.daily.revenue,color= as.factor(treated),
+                    linetype = as.factor(treated)))+
+  geom_point()+
+  geom_smooth(method='lm', formula = y~ns(x, df=3))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  scale_linetype_discrete(name="City", 
+                          breaks=c("0", "1"), 
+                          labels = c("Clarkston", "Pullman"))+
+   scale_colour_manual(values=cbPalette)+
+  labs(title='Summer and Fall Revenue(Seasonal Adjusted): pullman vs Clarkston') 
+    
+
+
+ggplot(data = ct_pm_treat1,
+       mapping= aes(x=date,y=adj.daily.revenue,color= as.factor(treated),
+                    linetype = as.factor(treated)))+
+  geom_point()+
+  geom_smooth(method='lm', formula = y~ns(x, df=3))+
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-7-20')),linetype="dashed", size=1, colour="gray")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-4-30')),linetype="dashed", size=1, colour="gray")+
+  scale_linetype_discrete(name="City", 
+                          breaks=c("0", "1"), 
+                          labels = c("Clarkston", "Pullman"))+
+   scale_colour_manual(values=cbPalette)+
+  labs(title='Spring and Summer Revenue(Seasonal Adjusted): pullman vs Clarkston') 
+
+#
+didreg_adjTOTRev_treat1 = lm(adj.daily.revenue~treated+T1_springEnd+did_T1_springEnd, data = ct_pm_treat1)
+summary(didreg_adjTOTRev_treat1) 
+
+# d-in-d regression
+didreg_adjTOTRev_treat2 = lm(adj.daily.revenue~treated+T2_fallStart+did_T2_fallStart, data = ct_pm_treat2)
+summary(didreg_adjTOTRev_treat2)
+# use seasonal adjusted
+didreg_adjTOTtrans_treat2 = lm(adj.daily.trans~treated+T2_fallStart+did_T2_fallStart, data = ct_pm_treat2)
+summary(didreg_adjTOTtrans_treat2)
+
+
+ggplot()+
+  geom_point(data = ct_fall, mapping= aes(x=date,y=revenue),color= "#56B4E9")+
+  geom_smooth(data = ct_fall, mapping = aes(x=date,y=revenue),
+              method='lm', formula = y~ns(x, df=3),color = "#0072B2")+
+  geom_point(data=pm_fall,mapping=aes(x=date,y=revenue),color ="#F0E442")+
+  geom_smooth(data=pm_fall, mapping = aes(x=date,y=revenue),
+              method='lm', formula = y~ns(x, df=3), color = "#CC79A7")+
+    labs(title='Summer and Fall Revenue: pullman vs Clarkston') 
+
+
+# d-in-d regression
+didreg_TOTRev_treat2 = lm(revenue~treated+T2_fallStart+did_T2_fallStart, data = ct_pm_treat2)
+summary(didreg_TOTRev_treat2) 
+
+
+# use seasonal adjusted
+didreg_adjTOTRev_treat2 = lm(adj.daily.revenue~treated+T2_fallStart+did_T2_fallStart, data = ct_pm_treat2)
+summary(didreg_adjTOTRev_treat2) 
+
+# seasonal adjusted are more significant than not adjusted
+```
+
+
+
+
+In terms of total revenues,The effect is significant at 0.01 level with the treatment having a positive effect.
+
+lm(formula = adj.daily.revenue ~ treated + T2_fallStart + did_T2_fallStart, 
+    data = ct_pm_treat2)
+                     Estimate    Std. Error t value Pr(>|t|)      
+  did_T2_fallStart   2251.4     1001.2   2.249   0.0251 *  
+
+
+
