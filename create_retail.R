@@ -174,8 +174,16 @@ retail$trans_usableweight <- as.numeric(retail$trans_usableweight)
 #   divide retail_price_x by retail_usableweight
 
 # sampling
-retail.list <- sample(retail$dispensingid, 150000, replace=F)
-retail.sample <- dplyr::filter(retail, dispensingid %in% retail.list)
+retail.sample <- retail %>%
+  # removing some values before sampling
+  dplyr::filter(!is.na(trans_saleprice), trans_saleprice > 0.1, trans_saleprice < 2000, 
+                retail_price_x > 0.1, retail_price_x < 150,
+                retail_typename!="Marijuana Infused Topicals", retail_typename!="Marijuana Mix Package",
+                retail_typename!="Marijuana Mix Infused", retail_typename!="Capsule",
+                retail_typename!="Suppository", retail_typename!="Tincture", !is.na(retail_typename))
+
+retail.list <- sample(retail.sample$retail_transactionid, 500000, replace=F)
+retail.sample <- dplyr::filter(retail.sample, retail_transactionid %in% retail.list)
 retail.sample <- retail.sample %>%
   dplyr::rowwise() %>%
   dplyr::mutate(
@@ -198,6 +206,28 @@ retail.sample <- retail.sample %>%
     retail_pricepergram = retail_price_x / retail_usableweight
   )
 
+# getting quarters. First running on just dates, then joining because too big otherwise
+retaildates <- as.data.frame(unique(retail.sample$saledate))
+colnames(retaildates) <- "dates"
+retaildates <- retaildates %>%
+  mutate(
+    quarter = ifelse(dates <= "2014-03-31", '2014 Q1',
+                     ifelse(dates <= "2014-06-30", '2014 Q2', 
+                            ifelse(dates <= "2014-09-30", '2014 Q3',
+                                   ifelse(dates <= "2014-12-31", '2014 Q4', 
+                                          ifelse(dates <= "2015-03-31", '2015 Q1', 
+                                                 ifelse(dates <= "2015-06-30", '2015 Q2', 
+                                                        ifelse(dates <= "2015-09-30", '2015 Q3', 
+                                                               ifelse(dates <= "2015-12-31", '2015 Q4', 
+                                                                      ifelse(dates <= "2016-03-31", '2016 Q1', 
+                                                                             ifelse(dates <= "2016-06-30", '2016 Q2', 
+                                                                                    ifelse(dates <= "2016-09-30", '2016 Q3', 
+                                                                                           ifelse(dates <= "2016-12-31", '2016 Q4', 
+                                                                                                  'other'))))))))))))
+  )
+
+retail.sample <- left_join(retail.sample, retaildates, by=c("saledate" = "dates"))
+
 #retail$retail_pricepergram <- retail$retail_price_x / retail$retail_usableweight
 # retail$unitsaleprice <- ifelse(!is.na(retail$retail_usableweight),
 #                                retail$retail_price_x / retail$retail_usableweight,
@@ -209,24 +239,23 @@ retail.sample <- retail.sample %>%
 #                                           retail$retail_price_x / retail$retail_usableweight,
 #                                           NA)
 
-
-write.table(retail.sample, file="../data/Dec2016/cleaned/testing/retailToTransfers.csv",
-            sep=",", row.names = F)
-
-# sample usable marijuana
-usable <- filter(retail.sample, retail_typename=="Usable Marijuana")
-samplelist <- sample(usable$dispensingid, 20000, replace=F)
-retail.sample.usable <- dplyr::filter(retail, dispensingid %in% samplelist)
-# write.table(retail.sample.usable, file="../data/Dec2016/cleaned/testing/retailUsable.csv",
+# write.table(retail.sample, file="../data/Dec2016/cleaned/testing/retailToTransfers.csv",
 #             sep=",", row.names = F)
 
+# sample for checking
+samplelist <- sample(retail.sample$retail_transactionid, 20000, replace=F)
+excel.sample <- dplyr::filter(retail.sample, retail_transactionid %in% samplelist)
+# write.table(excel.sample, file="../data/Dec2016/cleaned/testing/add_multi_sample.csv",
+#             sep=",", row.names = F)
 
+# plotting markups ------
 # plotting markups v2
 retail.sample %>%
-  filter(trans_pricepergram < 50, retail_pricepergram < 250, retail_pricepergram > 0,
+  filter(trans_pricepergram < 50, trans_pricepergram > 0.1,
+         retail_pricepergram < 250, retail_pricepergram > 0,
          #retail_typename!="Suppository", retail_typename!="Tincture", retail_typename!="Capsule"
-         retail_typename=="Usable Marijuana" | retail_typename=="Marijuana Extract for Inhalation" |
-           retail_typename=="Liquid Marijuana Infused Edible" | retail_typename=="Solid Marijuana Infused Edible"
+         #retail_typename=="Usable Marijuana" | retail_typename=="Marijuana Extract for Inhalation" |
+         retail_typename=="Liquid Marijuana Infused Edible" | retail_typename=="Solid Marijuana Infused Edible"
   ) %>%
   ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
   geom_point(alpha=0.25, color="darkgreen") + 
@@ -246,7 +275,8 @@ retail.sample %>%
          retail_typename=="Usable Marijuana"
   ) %>%
   ggplot(aes(x=trans_pricepergram, y=retail_pricepergram)) +
-  geom_point(alpha=0.25, color="darkgreen") + 
+  #geom_point(alpha=0.25, color="darkgreen") + 
+  geom_point(aes(color=quarter), alpha=0.25) + 
   geom_smooth(color="gold2", method = "lm") +
   #facet_wrap("retail_typename") +
   xlim(0, 125) + ylim(0, 125) +
