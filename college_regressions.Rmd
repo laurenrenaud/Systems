@@ -5,7 +5,7 @@ date: "April, 2017"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, cache=TRUE}
 knitr::opts_chunk$set(echo = TRUE)
 library(readr)
 library(dplyr)
@@ -614,13 +614,91 @@ didnoncollege_perc.usable = lm(perc.usable ~ college + beforeSummer + college_be
                 data = did_pullman_noncollege)
 summary(didnoncollege_perc.usable)
 
+# percent usable
+daily_aggregate_PullmanNoncollege %>%
+  ggplot(aes(x=saledate, y=perc.usable)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=perc.usable),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.usable), 
+              method = 'lm', color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.usable), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Percent Usable") +
+  facet_wrap("collegetown")
+
 didnoncollege_perc.extracts = lm(perc.extracts ~ college + beforeSummer + college_before,
                 data = did_pullman_noncollege)
 summary(didnoncollege_perc.extracts)
 
+# percent extract
+daily_aggregate_PullmanNoncollege %>%
+  ggplot(aes(x=saledate, y=perc.extracts)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=perc.extracts),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.extracts), 
+              method = 'lm', color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.extracts), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Percent Extracts") +
+  facet_wrap("collegetown")
+
 didnoncollege_perc.edible = lm(perc.edible ~ college + beforeSummer + college_before,
                 data = did_pullman_noncollege)
 summary(didnoncollege_perc.edible)
+
+# percent edible
+daily_aggregate_PullmanNoncollege %>%
+  ggplot(aes(x=saledate, y=perc.edible)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=perc.edible),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.edible), 
+              method = 'lm', color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_PullmanNoncollege,
+                          saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.edible), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Percent Edible") +
+  facet_wrap("collegetown")
 
 ```
 
