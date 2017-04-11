@@ -22,6 +22,8 @@ daily_aggregate_bycollegeBoolean <- readr::read_csv("college_towns/daily_aggrega
 
 daily_aggregate_PullmanNoncollege <- readr::read_csv("college_towns/daily_aggregate_PullmanNoncollege.csv")
 
+daily_aggregate_byTownType <- readr::read_csv("college_towns/daily_aggregate_byTownType.csv")
+
 ```
 
 
@@ -64,9 +66,65 @@ daily_aggregate %>%
 
 ##### Percent of sales that are extracts for inhalation
 
+##### Statewide and Other City Trends
+
+```{r statewide_graphs}
+daily_aggregate_bycollegeBoolean %>%
+  filter(!collegetown) %>%
+  ggplot(aes(x=saledate, y=revenue)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=revenue),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=revenue), 
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=revenue), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Revenue",
+       y = "Daily Revenue",
+       x = "Date, Summer Indicated in Green Bracket")
+
+daily_aggregate_bycollegeBoolean %>%
+  filter(!collegetown) %>%
+  ggplot(aes(x=saledate, y=tot_items)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Total Items Sold",
+       y = "Total Daily Items Sold",
+       x = "Date, Summer Indicated in Green Bracket")
+
+
+
+```
+
+
 ```{r pullman_inhalants, fig.width=6, fig.height=4.5}
 # extracts proportion
-daily_aggregate %>%
+daily_aggregate_by %>%
   #filter(collegetown==TRUE) %>%
   #filter(city=="PULLMAN", city=="WALLA WALLA", city=="ELLENSBURG") %>%
   filter(city=="PULLMAN") %>%
@@ -697,4 +755,133 @@ didnoncollegeFall_perc.edible = lm(perc.edible ~ college + fallSemester + colleg
                 data = did_pullman_noncollege_fallsem)
 summary(didnoncollegeFall_perc.edible)
 
+```
+
+
+
+#### Noncollege, Non Urban
+
+```{r noncollegenonurban}
+
+did_pullman_noncollege_nonurban <- daily_aggregate_byTownType %>%
+  filter(towntype_Pullman!="bigcity" & towntype_Pullman!="college") %>%
+  mutate(college = ifelse(towntype_Pullman=="Pullman", 1, 0),
+         beforeSummer = ifelse(saledate >= "2016-04-10" & saledate <= "2016-04-16", 1,
+                              ifelse(saledate >= "2016-05-22" & saledate <= "2016-05-28", 0,
+                                     NA)),
+         college_before = college * beforeSummer) %>%
+  filter(!is.na(beforeSummer))
+
+# DD Reg
+did_usable_noncollege_nonurban = lm(perc.usable ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_usable_noncollege_nonurban)
+
+did_edible_noncollege_nonurban = lm(perc.edible ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_edible_noncollege_nonurban)
+
+did_extracts_noncollege_nonurban = lm(perc.extracts ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_extracts_noncollege_nonurban)
+
+did_ppitem_noncollege_nonurban = lm(avg_price_peritem ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_ppitem_noncollege_nonurban)
+
+did_ppitem_noncollege_nonurban = lm(avg_price_peritem ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_ppitem_noncollege_nonurban)
+
+
+did_totItems_noncollege_nonurban = lm(tot_items ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_totItems_noncollege_nonurban)
+
+did_revenue_noncollege_nonurban = lm(revenue ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_revenue_noncollege_nonurban)
+```
+
+#### Fall Semester
+
+```{r fallsem}
+
+did_fallsem_noncollege_nonurban <- daily_aggregate_byTownType %>%
+  filter(towntype_Pullman!="bigcity" & towntype_Pullman!="college") %>%
+  mutate(college = ifelse(towntype_Pullman=="Pullman", 1, 0),
+         fallSemester = ifelse(saledate >= "2016-09-11" & saledate <= "2016-09-17", 1,
+                              ifelse(saledate >= "2016-07-31" & saledate <= "2016-08-06", 0,
+                                     NA)),
+         college_fall = college * fallSemester) %>%
+  filter(!is.na(fallSemester))
+
+# DD Reg
+didFall_usable_noncollege_nonurban = lm(perc.usable ~ college + fallSemester + college_fall,
+                data = did_fallsem_noncollege_nonurban)
+summary(didFall_usable_noncollege_nonurban)
+
+didFall_edible_noncollege_nonurban = lm(perc.edible ~ college + fallSemester + college_fall,
+                data = did_fallsem_noncollege_nonurban)
+summary(didFall_edible_noncollege_nonurban)
+
+didFall_extracts_noncollege_nonurban = lm(perc.extracts ~ college + fallSemester + college_fall,
+                data = did_fallsem_noncollege_nonurban)
+summary(didFall_extracts_noncollege_nonurban)
+
+didFall_ppitem_noncollege_nonurban = lm(avg_price_peritem ~ college + fallSemester + college_fall,
+                data = did_fallsem_noncollege_nonurban)
+summary(didFall_ppitem_noncollege_nonurban)
+
+didFall_totItems_noncollege_nonurban = lm(tot_items ~ college + fallSemester + college_fall,
+                data = did_fallsem_noncollege_nonurban)
+summary(didFall_totItems_noncollege_nonurban)
+
+didFall_revenue_noncollege_nonurban = lm(revenue ~ college + fallSemester + college_fall,
+                data = did_fallsem_noncollege_nonurban)
+summary(didFall_revenue_noncollege_nonurban)
+```
+
+#### Noncollege, Non Urban
+
+```{r noncollegenonurban}
+
+did_pullman_noncollege_nonurban <- daily_aggregate_byTownType %>%
+  filter(towntype_Pullman!="bigcity" & towntype_Pullman!="college") %>%
+  mutate(college = ifelse(towntype_Pullman=="Pullman", 1, 0),
+         beforeSummer = ifelse(saledate >= "2016-04-10" & saledate <= "2016-04-16", 1,
+                              ifelse(saledate >= "2016-05-22" & saledate <= "2016-05-28", 0,
+                                     NA)),
+         college_before = college * beforeSummer) %>%
+  filter(!is.na(beforeSummer))
+
+# DD Reg
+did_usable_noncollege_nonurban = lm(perc.usable ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_usable_noncollege_nonurban)
+
+did_edible_noncollege_nonurban = lm(perc.edible ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_edible_noncollege_nonurban)
+
+did_extracts_noncollege_nonurban = lm(perc.extracts ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_extracts_noncollege_nonurban)
+
+did_ppitem_noncollege_nonurban = lm(avg_price_peritem ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_ppitem_noncollege_nonurban)
+
+did_ppitem_noncollege_nonurban = lm(avg_price_peritem ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_ppitem_noncollege_nonurban)
+
+
+did_totItems_noncollege_nonurban = lm(tot_items ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_totItems_noncollege_nonurban)
+
+did_revenue_noncollege_nonurban = lm(revenue ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege_nonurban)
+summary(did_revenue_noncollege_nonurban)
 ```

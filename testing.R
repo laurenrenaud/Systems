@@ -7,8 +7,6 @@ solvents$solvent_tested <- !is.na(solvents$value)
 
 table(solvents$solvent_tested)
 
-
-
 # first get list/df of inhalantnames
 inhalantnames <- as.data.frame(unique(solvents$productname[solvents$inv_type_name=="Marijuana Extract for Inhalation"]))
 # rename column so we can call it
@@ -44,7 +42,7 @@ inhalantnames <- inhalantnames %>%
                                                           "unknown"))))
   )
 
-write.table(inhalantnames, file="../data/Dec2016/cleaned/testing/inhalant_prodnames_dec2016.csv", row.names=F, sep=",")
+#write.table(inhalantnames, file="../data/Dec2016/cleaned/testing/inhalant_prodnames_dec2016.csv", row.names=F, sep=",")
 
 # join classified inhalantnames back to dispening df
 solvents$productname <- as.factor(solvents$productname)
@@ -98,6 +96,6 @@ prod_names <- solvents %>%
   # ) %>%
   arrange(extraction, ever_solvent_test, desc(inhalant_marketrank))
   
-table(prod_names$ever_solvent_test, prod_names$consumption)
+table(prod_names$ever_solvent_test, prod_names$type)
   
-write.table(prod_names, file="../data/Dec2016/cleaned/testing/inhalant_names_solvents.csv", sep=",", row.names = F)
+#write.table(prod_names, file="../data/Dec2016/cleaned/testing/inhalant_names_solvents.csv", sep=",", row.names = F)
