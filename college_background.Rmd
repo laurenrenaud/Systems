@@ -20,7 +20,9 @@ inv.types <- readr::read_csv("../data/Dec2016/cleaned/inventory_type.csv")
 
 retail.select <- retail %>%
   # one and a half school years
-  dplyr::filter(saledate >= "2015-09-01") %>%
+  #dplyr::filter(saledate >= "2015-09-01") %>%
+  # going back to get two summers
+   dplyr::filter(saledate >= "2015-05-15") %>%
   # get cities for retail locations
   dplyr::left_join(select(locations, id, city), by=c("location" = "id")) %>%
               # college town variable
@@ -756,4 +758,89 @@ didnoncollegeFall_perc.edible = lm(perc.edible ~ college + fallSemester + colleg
                 data = did_pullman_noncollege_fallsem)
 summary(didnoncollegeFall_perc.edible)
 
+```
+
+
+
+```{r statewide_graphs}
+daily_aggregate_bycollegeBoolean %>%
+  filter(!collegetown) %>%
+  ggplot(aes(x=saledate, y=revenue)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=revenue),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=revenue), 
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=revenue), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Revenue",
+       y = "Daily Revenue",
+       x = "Date, Summer Indicated in Green Bracket")
+
+daily_aggregate_bycollegeBoolean %>%
+  filter(!collegetown) %>%
+  ggplot(aes(x=saledate, y=tot_items)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate_bycollegeBoolean, !collegetown & saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Total Items Sold",
+       y = "Total Daily Items Sold",
+       x = "Date, Summer Indicated in Green Bracket")
+
+
+
+```
+
+
+```{r pullman_inhalants, fig.width=6, fig.height=4.5}
+# extracts proportion
+daily_aggregate %>%
+  #filter(collegetown==TRUE) %>%
+  #filter(city=="PULLMAN", city=="WALLA WALLA", city=="ELLENSBURG") %>%
+  filter(city=="PULLMAN") %>%
+  ggplot(aes(x=saledate, y=perc.extracts)) +
+  geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=perc.extracts),
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.extracts), 
+              method = 'lm',color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=perc.extracts), 
+              method = 'lm',color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Percent of Sales that are Inhalants",
+       y = "Percent Inhalants",
+       x = "Date, Summer Indicated in Green Bracket")
 ```
