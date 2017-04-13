@@ -23,6 +23,10 @@ categorizeSubtype <- function(subtype){
   #' product category type
   #' @param subtype  A string of inhalant product names
   #' @return A categorized usage of the productname as a string.
+  #' Takes a resource subtype and categorizes it into a 
+  #' Particular type of use of the resource
+  #' @param subtype  A string resource.hub subtype
+  #' @return A categorized usage of the resource as a string.
   
   # cartidge
   if(grepl("cartridge_string", subtype, ignore.case=TRUE)){
