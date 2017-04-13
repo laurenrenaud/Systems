@@ -18,10 +18,10 @@ cartridge_string <- keyWordsToRegex(
 ## and then use %in% with " "
  
 
-categorizeSubtype <- function(subtype){
+categorizeProdName <- function(productName){
   #' Takes product name and categorizes it into a 
   #' product category type
-  #' @param subtype  A string of inhalant product names
+  #' @param productName  A string of inhalant product names
   #' @return A categorized usage of the productname as a string.
   #' Takes a resource subtype and categorizes it into a 
   #' Particular type of use of the resource
@@ -40,5 +40,5 @@ categorizeSubtype <- function(subtype){
 }
 
 # use categeories
-inhalantnames$Type <- as.character(sapply(as.character(inhalantnames$productname), categorizeSubtype))
+inhalantnames$Type <- as.character(sapply(as.character(inhalantnames$productname), categorizeProdName))
 
