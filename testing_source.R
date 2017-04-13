@@ -9,6 +9,6 @@ retail_oct <- select(retail_oct, retail_prodname = productname)
 # pull in category function
 source("testing_partitionFunction.R")
 # use categeories
-retail_oct$category <- as.character(sapply(as.character(retail_oct$retail_prodname), categorizeProductName))
+retail_oct$category <- as.factor(sapply(as.character(retail_oct$retail_prodname), categorizeProductName))
 
 table(retail_oct$category)
