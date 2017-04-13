@@ -1,3 +1,6 @@
+library(readr)
+library(dplyr)
+
 retail_oct <- readr::read_csv("../data/Dec2016/cleaned/testing/oct_inhalant_prodnamesonly.csv")
 
 retail_oct <- select(retail_oct, retail_prodname = productname)
