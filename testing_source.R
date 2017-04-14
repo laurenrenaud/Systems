@@ -7,8 +7,12 @@ retail_oct <- select(retail_oct, retail_prodname = productname)
 
 
 # pull in category function
-source("testing_partitionFunction.R")
+source("categorization_extracts_function.R")
 # use categeories
-retail_oct$category <- as.factor(sapply(as.character(retail_oct$retail_prodname), categorizeProductName))
+retail_oct$category <- as.factor(sapply(as.character(retail_oct$retail_prodname), categorizeNames))
 
 table(retail_oct$category)
+
+# uncategorized is higher now, can think later about why, how much of a difference this "strict"
+# classification makes
+sum(retail_oct$category=="Uncategorized") / nrow(retail_oct)
