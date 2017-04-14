@@ -1,0 +1,79 @@
+---
+title: "Category_walkthrough"
+author: "Ellie Najewicz"
+date: "April 13, 2017"
+output: html_document
+---
+```{r}
+setwd("~/DrugData/samples")
+#set up - reading in spreadsheet and cleaning
+Extracts <- read.csv("inahlants.csv")
+#make sure data is read as a date
+Extracts$saletime <- as.Date(Extracts$saletime)
+
+```
+
+## createing the Categories
+This application works for categorizing a list of names into about 7 different product categories:
+```{r}
+#create search terms for each product type
+cartridge.strings <- "cart|vap|vc|pen|refill|juju|joint"
+oil.strings <- "oil|rso|eso"
+hash.strings <- "hash"
+kief.strings <- "kief|keif"
+wax.strings <- "wax"
+shatter.strings <- "shatter"
+dab.strings <-"dab"
+resin.strings <- "resin|rosin"
+
+
+#create a list of unique product names
+inhalantnames <- as.data.frame(unique(Extracts$productname))
+# rename column so we can call it below
+colnames(inhalantnames) <- "productname"
+```
+
+
+```{r}
+category.vec <- c()
+for (i in 1:nrow(inhalantnames)) {
+  #first check for cartridges. allow for oil to be in product name so that for example "oil cartridge" will be classified as a cartridge
+  if (grepl( cartridge.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(hash.strings, kief.strings, wax.strings,shatter.strings, dab.strings, resin.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "cartidge"
+  #now check for oil products. allow for hash to also be in product name so that "hash oil" is classified as oil
+  else if (grepl( oil.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(cartridge.strings, kief.strings, wax.strings,shatter.strings, dab.strings, resin.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "oil"
+  #check for hash products. Allow for no overlap with other products
+  else if (grepl( hash.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, dab.strings, resin.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "hash"
+  #check for kief products. Allow for no overlap with other products
+  else if (grepl( kief.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(cartridge.strings, hash.strings,oil.strings, wax.strings,shatter.strings, dab.strings, resin.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "kief"
+  #check for wax products. Allow for no overlap with other products
+  else if (grepl( wax.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(cartridge.strings, kief.strings,oil.strings, hash.strings,shatter.strings, dab.strings, resin.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "wax"
+  #check for shatter products. Allow for no overlap with other products
+  else if (grepl( shatter.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings, hash.strings, dab.strings, resin.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "shatter"
+  #check for dab products. Allow for no overlap with other products
+  else if (grepl( dab.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, hash.strings, resin.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "dab"
+  #check for resin products. Allow for no overlap with other products
+  else if (grepl( resin.strings, inhalantnames$productname[i], ignore.case = T) == TRUE & 
+  grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, dab.strings, hash.strings, sep = "|"), inhalantnames$productname[i], ignore.case = T) == FALSE) y <- "resin"
+  else y <- "uncategorized"
+#store all values in vector
+   category.vec <- c(category.vec, y)
+}
+#add vector 
+inhalantnames$producttype <- as.factor(category.vec)
+
+```
+
+
+```{r}
+#check to make sure it worked
+summary(inhalantnames$producttype)
+
+```
+
