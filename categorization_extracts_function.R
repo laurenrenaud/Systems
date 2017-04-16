@@ -22,7 +22,7 @@ categorizeNames <- function(productName){
     return("Cartridge")
   }
   # now check for oil products. allow for hash to also be in product name so that "hash oil" is classified as oil
-  else if(grepl( cartridge.strings, productName, ignore.case = T) == TRUE & 
+  else if(grepl(oil.strings, productName, ignore.case = T) == TRUE & 
      grepl(paste(hash.strings, kief.strings, wax.strings,shatter.strings, dab.strings, resin.strings, sep = "|"), 
            productName, ignore.case = T) == FALSE) {
     return("Oil")
@@ -62,6 +62,31 @@ categorizeNames <- function(productName){
            grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, dab.strings, 
                        hash.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
     return("Resin")
+  }
+  else return("Uncategorized")
+}
+
+
+groupProductTypes <- function(productType){
+  #' Takes product type and categorizes it into a 
+  #' product category grouping
+  #' @param productType  A string of inhalant product type
+  #' @return A grouped usage of the product type as a string.
+  
+  if(productType=="Cartridge") {
+    return("Cartridge")
+  }
+  
+  else if(productType=="Hash" | productType=="Kief") {
+    return("Hash/Kief")
+  }
+  
+  else if(productType=="Wax" | productType=="Shatter" | productType=="Dab" | productType=="Resin") {
+    return("Wax/Shatter/Dab/Resin")
+  }
+  
+  else if(productType=="Oil") {
+    return("Oil")
   }
   else return("Uncategorized")
 }
