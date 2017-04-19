@@ -282,8 +282,8 @@ retail.byquarter.bytype %>%
   #facet_wrap("retail_typename") +
   scale_colour_brewer(palette = "Reds") +
   xlim(0, 8) + ylim(0, 25) +
-  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=1) +
-  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=1, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
   labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 

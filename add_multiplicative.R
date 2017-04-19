@@ -176,40 +176,50 @@ retaildates <- retaildates %>%
 retail.sample <- left_join(retail.sample, retaildates, by=c("saledate" = "dates"))
 
 # first get list/df of inhalantnames
-inhalantnames <- as.data.frame(unique(retail.sample$retail_prodname))
+inhalantnames <- as.data.frame(unique(retail.sample$retail_prodname[retail.sample$retail_typename=="Marijuana Extract for Inhalation"]))
+
 # rename column so we can call it
 colnames(inhalantnames) <- "retail_prodname"
 
-# get a df that is for each unique inhalant name, the boolean values for categorizing
+# bringing in classification function
+source("categorization_extracts_function.R")
 inhalantnames <- inhalantnames %>%
-  dplyr::rowwise() %>%
-  # boolean for cartridge
-  dplyr::mutate(cartridge = grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T),
-                # extraction method
-                extraction = ifelse(grepl("BHO|butane", retail_prodname, ignore.case = T), "BHO",
-                                ifelse(grepl("CO2", retail_prodname, ignore.case = T), "CO2",
-                                       "unknown"
-                                )),
-                # type
-                type = ifelse(grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T), "cartridge", 
-                                    ifelse(grepl("oil", retail_prodname, ignore.case=T), "oil",
-                                           ifelse(grepl("wax", retail_prodname, ignore.case=T), "wax",
-                                                  ifelse(grepl("hash", retail_prodname, ignore.case = T), "hash",
-                                                         ifelse(grepl("kief|keif", retail_prodname, ignore.case = T), "kief",
-                                                                ifelse(grepl("shatter", retail_prodname, ignore.case = T), "shatter",
-                                                                       ifelse(grepl("dab", retail_prodname, ignore.case = T), "dab",
-                                                                              ifelse(grepl("resin", retail_prodname, ignore.case = T), "resin",
-                                                                                     ifelse(grepl("bubble", retail_prodname, ignore.case = T), "bubble",
-                                                                                            "unknown"))))))))),
-                # mode
-                mode = ifelse(grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T), "vaping",
-                              # we think oil is related to vaping, but also it could be consumed orally or in edibles
-                              ifelse(grepl("keif|kief|hash", retail_prodname, ignore.case = T), "smoking", 
-                                     ifelse(grepl("wax|shatter|dab|resin", retail_prodname, ignore.case=T), "dabbing",
-                                            ifelse(grepl("oil", retail_prodname, ignore.case = T), "oil",
-                                                   "unknown"))))
-                
-  )
+  rowwise() %>%
+  mutate(inhalant_type = categorizeNames(retail_prodname),
+         inhalant_gen = groupProductTypes(inhalant_type))
+
+ 
+# # get a df that is for each unique inhalant name, the boolean values for categorizing
+# inhalantnames <- inhalantnames %>%
+#   dplyr::rowwise() %>%
+#   # boolean for cartridge
+#   dplyr::mutate(cartridge = grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T),
+#                 # extraction method
+#                 extraction = ifelse(grepl("BHO|butane", retail_prodname, ignore.case = T), "BHO",
+#                                 ifelse(grepl("CO2", retail_prodname, ignore.case = T), "CO2",
+#                                        "unknown"
+#                                 )),
+#                 # type
+#                 type = ifelse(grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T), "cartridge", 
+#                                     ifelse(grepl("oil", retail_prodname, ignore.case=T), "oil",
+#                                            ifelse(grepl("wax", retail_prodname, ignore.case=T), "wax",
+#                                                   ifelse(grepl("hash", retail_prodname, ignore.case = T), "hash",
+#                                                          ifelse(grepl("kief|keif", retail_prodname, ignore.case = T), "kief",
+#                                                                 ifelse(grepl("shatter", retail_prodname, ignore.case = T), "shatter",
+#                                                                        ifelse(grepl("dab", retail_prodname, ignore.case = T), "dab",
+#                                                                               ifelse(grepl("resin", retail_prodname, ignore.case = T), "resin",
+#                                                                                      ifelse(grepl("bubble", retail_prodname, ignore.case = T), "bubble",
+#                                                                                             "unknown"))))))))),
+#                 # mode
+#                 mode = ifelse(grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T), "vaping",
+#                               # we think oil is related to vaping, but also it could be consumed orally or in edibles
+#                               ifelse(grepl("keif|kief|hash", retail_prodname, ignore.case = T), "smoking", 
+#                                      ifelse(grepl("wax|shatter|dab|resin", retail_prodname, ignore.case=T), "dabbing",
+#                                             ifelse(grepl("oil", retail_prodname, ignore.case = T), "oil",
+#                                                    "unknown"))))
+#                 
+#   )
+
 # join classified inhalantnames back to dispening df
 retail.sample$retail_prodname <- as.factor(retail.sample$retail_prodname)
 retail.sample <- left_join(retail.sample, inhalantnames, by="retail_prodname")
@@ -249,7 +259,14 @@ retail.byquarter.extractmethod <- retail.sample %>%
 
 retail.byquarter.inhaltype <- retail.sample %>%
   dplyr::filter(retail_typename == "Marijuana Extract for Inhalation") %>%
-  dplyr::group_by(quarter, type) %>%
+  dplyr::group_by(quarter, inhalant_type) %>%
+  dplyr::summarise(avg_retailpricecpergram = median(retail_pricepergram, na.rm=T),
+                   avg_wholesalepricepergram = median(trans_pricepergram, na.rm=T)
+  )
+
+retail.byquarter.inhalGen <- retail.sample %>%
+  dplyr::filter(retail_typename == "Marijuana Extract for Inhalation") %>%
+  dplyr::group_by(quarter, inhalant_gen) %>%
   dplyr::summarise(avg_retailpricecpergram = median(retail_pricepergram, na.rm=T),
                    avg_wholesalepricepergram = median(trans_pricepergram, na.rm=T)
   )
@@ -263,7 +280,9 @@ retail.byquarter.all %>%
   #geom_smooth(color="gold2", method = "lm") +
   #facet_wrap("retail_typename") +
   scale_colour_brewer(palette = "Reds") +
-  xlim(0, 25) + ylim(0, 25) +
+  xlim(0, 8) + ylim(0, 25) +
+  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=0.75, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
   labs(title="Relationship Between Processor and Retail Prices \nUsable & Inhalants",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
@@ -278,7 +297,9 @@ retail.byquarter.bytype %>%
   #geom_smooth(color="gold2", method = "lm") +
   #facet_wrap("retail_typename") +
   scale_colour_brewer(palette = "Reds") +
-  xlim(0, 25) + ylim(0, 25) +
+  xlim(0, 8) + ylim(0, 25) +
+  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=0.75, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
   labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
@@ -286,14 +307,16 @@ retail.byquarter.bytype %>%
 
 retail.byquarter.bytype %>%
   dplyr::filter(retail_typename == "Marijuana Extract for Inhalation",
-                !is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram, quarter!="other")) %>%
+                !is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram), quarter!="other") %>%
   ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
   #geom_point(alpha=0.25, color="darkgreen") + 
   geom_point(aes(color=quarter), alpha=.9, size=3) + 
   #geom_smooth(color="gold2", method = "lm") +
   #facet_wrap("retail_typename") +
   scale_colour_brewer(palette = "Reds") +
-  xlim(0, 65) + ylim(0, 65) +
+  xlim(0, 25) + ylim(0, 65) +
+  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=0.75, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
@@ -338,9 +361,30 @@ retail.byquarter.inhaltype %>%
   geom_smooth(color="gold2", method = "lm") +
   geom_point(aes(color=quarter), alpha=.9, size=3) + 
   scale_colour_brewer(palette = "Reds") +
-  facet_wrap("type") +
-  xlim(0, 25) + ylim(0, 75) +
+  facet_wrap("inhalant_type") +
+  xlim(0, 35) + ylim(0, 100) +
+  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=0.75, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, by Product Type",
+       x="Processor's Price Per Gram",
+       y="Retail Price Per Gram") + 
+  theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
+
+
+retail.byquarter.inhalGen %>%
+  dplyr::filter(!is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram), 
+                # dropping 2015 Q2 because of high skew
+                quarter!="other", quarter!="2015 Q2") %>%
+  ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
+  #geom_point(alpha=0.25, color="darkgreen") + 
+  geom_smooth(color="gold2", method = "lm") +
+  geom_point(aes(color=quarter), alpha=.9, size=3) + 
+  scale_colour_brewer(palette = "Reds") +
+  facet_wrap("inhalant_gen") +
+  xlim(0, 35) + ylim(0, 100) +
+  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=1, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
+  labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, by Inhalant Category",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
   theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))

@@ -144,6 +144,12 @@ retail <- retail %>%
 # need to look into it further, but dropping them for now
 #retail.id.check <- select(retail, dispensingid, retail_inventoryid)
 #trans.id.check <- select(trans.select, trans_id, trans_invid)
+#### From Valinda:
+# Take the most recent trans_invid (meaning highest number id, highest value)
+# that also matches that location
+# it's any time things move, including if something moves back out of a store
+# back to a processor because they didn't sell all of them or something
+
 dupe.disID <- retail %>%
   select(dispensingid, retail_inventoryid) %>%
   left_join(select(trans.select, trans_id, trans_invid), by=c("retail_inventoryid" = "trans_invid")) %>%
