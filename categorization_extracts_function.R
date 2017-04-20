@@ -73,8 +73,8 @@ groupProductTypes <- function(productType){
   #' @param productType  A string of inhalant product type
   #' @return A grouped usage of the product type as a string.
   
-  if(productType=="Cartridge") {
-    return("Cartridge")
+  if(productType=="Cartridge" | productType=="Oil") {
+    return("Cartridge/Oil")
   }
   
   else if(productType=="Hash" | productType=="Kief") {
@@ -85,8 +85,31 @@ groupProductTypes <- function(productType){
     return("Wax/Shatter/Dab/Resin")
   }
   
+  else return("Uncategorized")
+}
+
+
+groupProductTypesOilSep <- function(productType){
+  #' Takes product type and categorizes it into a 
+  #' product category grouping
+  #' @param productType  A string of inhalant product type
+  #' @return A grouped usage of the product type as a string.
+  
+  if(productType=="Cartridge") {
+    return("Cartridge")
+  }
+  
   else if(productType=="Oil") {
     return("Oil")
   }
+  
+  else if(productType=="Hash" | productType=="Kief") {
+    return("Hash/Kief")
+  }
+  
+  else if(productType=="Wax" | productType=="Shatter" | productType=="Dab" | productType=="Resin") {
+    return("Wax/Shatter/Dab/Resin")
+  }
+  
   else return("Uncategorized")
 }
