@@ -7,7 +7,7 @@ retail_oct <- select(retail_oct, retail_prodname = productname)
 
 
 # pull in category function
-source("categorization_extracts_function.R")
+source("categorization_function.R")
 # use categeories
 retail_oct$category <- as.factor(sapply(as.character(retail_oct$retail_prodname), categorizeNames))
 

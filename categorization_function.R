@@ -113,3 +113,48 @@ groupProductTypesOilSep <- function(productType){
   
   else return("Uncategorized")
 }
+
+
+
+groupProcessorProductTypes <- function(productType){
+  #' Takes product type and categorizes it into a 
+  #' product category grouping
+  #' @param productType  A string of  product type
+  #' @return A grouped usage of the product type as a string.
+  
+  if(productType=="Clone" | productType=="Mature Plant" | productType=="Flower Lot" | 
+     productType=="Other Plant Material Lot" | productType=="Seed" | productType=="Plant Tissue" |
+     productType=="Wet Flower") {
+    return("Plant/Material")
+  }
+  else if(productType=="Sample Jar") {
+    return("Sample")
+  }
+  else if(productType=="Usable Marijuana" | productType=="Flower") {
+    return("Usable Marijuana")
+  }
+  else if(productType=="Marijuana Extract for Inhalation" | productType=="CO2 Hash Oil") {
+    return("Extracts for Inhalation")
+  }
+  else if(productType=="Kief" | productType=="Hash") {
+    return("Hash/Kief")
+  }
+  else if(productType=="Solid Marijuana Infused Edible" | productType=="Liquid Marijuana Infused Edible") {
+    return("Edible")
+  }
+  else if(productType=="Food Grade Solvent Extract" | productType=="Infused Cooking Oil" | 
+          productType=="Infused Dairy Butter or Fat in Solid Form") {
+    return("Edibles Ingredients")
+  }
+  else if(productType=="Bubble Hash" | productType=="Hydrocarbon Wax") {
+    return("Wax/BubbleHash")
+  }
+  else if(productType=="Marijuana Infused Topicals" | productType=="Capsule" | productType=="Tincture" | productType=="Suppository") {
+    return("Topical/Capsule/Tincture/Suppository")
+  }
+  else if(productType=="Marijuana Mix" | productType=="Marijuana Mix Package" | productType=="Marijuana Mix Infused") {
+    return("Topical/Capsule/Tincture/Suppository")
+  }
+  
+  else return("Uncategorized")
+}

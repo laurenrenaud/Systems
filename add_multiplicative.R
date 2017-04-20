@@ -182,7 +182,7 @@ inhalantnames <- as.data.frame(unique(retail.sample$retail_prodname[retail.sampl
 colnames(inhalantnames) <- "retail_prodname"
 
 # bringing in classification function
-source("categorization_extracts_function.R")
+source("categorization_function.R")
 inhalantnames <- inhalantnames %>%
   rowwise() %>%
   mutate(inhalant_type = categorizeNames(retail_prodname),

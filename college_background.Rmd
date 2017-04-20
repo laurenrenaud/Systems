@@ -94,7 +94,7 @@ daily_aggregate_byTownType <- retail.select %>%
   filter(revenue >= 0)
 
 # get categorization functions
-source("categorization_extracts_function.R")
+source("categorization_function.R")
 inhalnames <- as.data.frame(unique(retail.select$productname[retail.select$inv_type_name=="Marijuana Extract for Inhalation"]))
 colnames(inhalnames) <- "productname"
 inhalnames$inhal_types <- as.factor(sapply(as.character(inhalnames$productname), categorizeNames))
