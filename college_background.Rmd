@@ -17,6 +17,8 @@ retail$saledate <- as.Date(as.POSIXct(retail$sessiontime, origin = "1970-01-01",
 
 locations <- readr::read_csv("../data/Dec2016/biotrackthc_locations.csv")
 inv.types <- readr::read_csv("../data/Dec2016/cleaned/inventory_type.csv")
+# in order to get product names to classify inhalants
+inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 
 retail.select <- retail %>%
   # one and a half school years
@@ -42,8 +44,8 @@ retail.select <- retail %>%
   # bring in inventory type names
   dplyr::left_join(inv.types, by="inventorytype") %>%
   dplyr::select(retail_id = id, transactionid, location, city, collegetown, bigcity, towntype,
-                price_x, saledate,
-                inv_type_name)
+                price_x, saledate, inv_type_name, inventoryid) %>%
+  dplyr::left_join(select(inventory, id, productname), by=c("inventoryid" = "id"))
 
 daily_aggregate <- retail.select %>%
   dplyr::group_by(city, saledate) %>%
@@ -91,6 +93,31 @@ daily_aggregate_byTownType <- retail.select %>%
   ) %>%
   filter(revenue >= 0)
 
+# get categorization functions
+source("categorization_extracts_function.R")
+inhalnames <- as.data.frame(unique(retail.select$productname[retail.select$inv_type_name=="Marijuana Extract for Inhalation"]))
+colnames(inhalnames) <- "productname"
+inhalnames$inhal_types <- as.factor(sapply(as.character(inhalnames$productname), categorizeNames))
+inhalnames$inhal_groups <- as.factor(sapply(as.character(inhalnames$inhal_types), groupProductTypes))
+retail.select$productname <- as.factor(retail.select$productname)
+retail.select <- left_join(retail.select, inhalnames, by="productname")
+
+daily_aggregate_inhaltypes_byTownType <- retail.select %>%
+  dplyr::filter(inv_type_name=="Marijuana Extract for Inhalation") %>%
+  dplyr::mutate(towntype_Pullman = ifelse(city=="PULLMAN", "Pullman", towntype)) %>%
+  dplyr::group_by(towntype_Pullman, saledate) %>%
+  dplyr::filter(saledate < "2017-01-01") %>%
+  dplyr::summarise(
+    revenue = sum(price_x, na.rm = T),
+    tot_items = length(retail_id),
+    avg_price_peritem = revenue / tot_items,
+    perc.cart_oil = sum(inhal_groups == "Cartridge/Oil", na.rm = T) / tot_items,
+    perc.hash_kief = sum(inhal_groups == "Hash/Kief", na.rm = T) / tot_items,
+    perc.wax_shatter_dab_resin = sum(inhal_groups == "Wax/Shatter/Dab/Resin", na.rm = T) / tot_items,
+    perc.uncategorized = sum(inhal_groups == "Uncategorized", na.rm = T) / tot_items
+  ) %>%
+  filter(revenue >= 0)
+
 # write out
 write.table(daily_aggregate, file="college_towns/daily_aggregate.csv",
             row.names=F, col.names=T, sep=",")
@@ -99,6 +126,9 @@ write.table(daily_aggregate_bycollegeBoolean,
             row.names=F, col.names=T, sep=",")
 write.table(daily_aggregate_byTownType,
             file="college_towns/daily_aggregate_byTownType.csv",
+            row.names=F, col.names=T, sep=",")
+write.table(daily_aggregate_inhaltypes_byTownType,
+            file="college_towns/daily_aggregate_inhaltypes_byTownType.csv",
             row.names=F, col.names=T, sep=",")
 ```
 

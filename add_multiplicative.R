@@ -186,39 +186,7 @@ source("categorization_extracts_function.R")
 inhalantnames <- inhalantnames %>%
   rowwise() %>%
   mutate(inhalant_type = categorizeNames(retail_prodname),
-         inhalant_gen = groupProductTypes(inhalant_type))
-
- 
-# # get a df that is for each unique inhalant name, the boolean values for categorizing
-# inhalantnames <- inhalantnames %>%
-#   dplyr::rowwise() %>%
-#   # boolean for cartridge
-#   dplyr::mutate(cartridge = grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T),
-#                 # extraction method
-#                 extraction = ifelse(grepl("BHO|butane", retail_prodname, ignore.case = T), "BHO",
-#                                 ifelse(grepl("CO2", retail_prodname, ignore.case = T), "CO2",
-#                                        "unknown"
-#                                 )),
-#                 # type
-#                 type = ifelse(grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T), "cartridge", 
-#                                     ifelse(grepl("oil", retail_prodname, ignore.case=T), "oil",
-#                                            ifelse(grepl("wax", retail_prodname, ignore.case=T), "wax",
-#                                                   ifelse(grepl("hash", retail_prodname, ignore.case = T), "hash",
-#                                                          ifelse(grepl("kief|keif", retail_prodname, ignore.case = T), "kief",
-#                                                                 ifelse(grepl("shatter", retail_prodname, ignore.case = T), "shatter",
-#                                                                        ifelse(grepl("dab", retail_prodname, ignore.case = T), "dab",
-#                                                                               ifelse(grepl("resin", retail_prodname, ignore.case = T), "resin",
-#                                                                                      ifelse(grepl("bubble", retail_prodname, ignore.case = T), "bubble",
-#                                                                                             "unknown"))))))))),
-#                 # mode
-#                 mode = ifelse(grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T), "vaping",
-#                               # we think oil is related to vaping, but also it could be consumed orally or in edibles
-#                               ifelse(grepl("keif|kief|hash", retail_prodname, ignore.case = T), "smoking", 
-#                                      ifelse(grepl("wax|shatter|dab|resin", retail_prodname, ignore.case=T), "dabbing",
-#                                             ifelse(grepl("oil", retail_prodname, ignore.case = T), "oil",
-#                                                    "unknown"))))
-#                 
-#   )
+         inhalant_gen = groupProductTypesOilSep(inhalant_type))
 
 # join classified inhalantnames back to dispening df
 retail.sample$retail_prodname <- as.factor(retail.sample$retail_prodname)
@@ -376,7 +344,6 @@ retail.byquarter.inhalGen %>%
                 # dropping 2015 Q2 because of high skew
                 quarter!="other", quarter!="2015 Q2") %>%
   ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
-  #geom_point(alpha=0.25, color="darkgreen") + 
   geom_smooth(color="gold2", method = "lm") +
   geom_point(aes(color=quarter), alpha=.9, size=3) + 
   scale_colour_brewer(palette = "Reds") +
