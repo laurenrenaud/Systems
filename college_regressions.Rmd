@@ -20,6 +20,16 @@ library(splines)
 # dfs for this analysis
 daily_aggregate <- readr::read_csv("college_towns/daily_aggregate.csv")
 
+daily_agg_summary <- daily_aggregate %>%
+  group_by(saledate) %>%
+  summarise(revenue = median(revenue, na.rm=T),
+            tot_items = median(tot_items, na.rm=T),
+            avg_price_peritem = median(avg_price_peritem, na.rm=T),
+            perc.usable = median(perc.usable, na.rm=T),
+            perc.edible = median(perc.edible, na.rm=T),
+            perc.extracts = median(perc.extracts, na.rm=T),
+            city = "State_Avg")
+
 daily_aggregate_bycollegeBoolean <- readr::read_csv("college_towns/daily_aggregate_bycollegeBoolean.csv")
 
 daily_aggregate_PullmanNoncollege <- readr::read_csv("college_towns/daily_aggregate_PullmanNoncollege.csv")
@@ -32,6 +42,222 @@ daily_aggregate_inhaltypes_byTownType <- readr::read_csv("college_towns/daily_ag
 
 
 ## Introduction
+
+## General seasonality
+
+```{r overall_seasonality}
+
+overall_agg <- daily_aggregate %>%
+  ggplot(aes(x=saledate, y=tot_items)) +
+  # geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Total Items Sold: State Aggregate",
+       y = "Total Items Sold",
+       x = "Date, Summer Indicated in Green Bracket")
+
+pullman_agg <- daily_aggregate %>%
+  ggplot(aes(x=saledate, y=tot_items)) +
+  # geom_point() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Total Items Sold: Pullman",
+       y = "Total Items Sold",
+       x = "Date, Summer Indicated in Green Bracket")
+
+grid.arrange(overall_agg, pullman_agg)
+
+
+daily_aggregate %>%
+  ggplot(aes(x=saledate, y=tot_items)) +
+  # geom_point() +
+  # State aggregate
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7", linetype="dotted") +
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7", linetype="dotted") +
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "#CC79A7", linetype="dotted") +
+  # just Pullman
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm', formula = y~ns(x, df=3), color =  "darkgreen") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "darkgreen") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=3), color =  "darkgreen") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Total Items Sold: State Dotted, Pullman Solid",
+       y = "Total Items Sold",
+       x = "Date, Summer Indicated in Bracket")
+
+
+
+daily_aggregate %>%
+  ggplot(aes(x=saledate, y=tot_items)) +
+  # geom_point() +
+  # State aggregate
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm', formula = y~ns(x, df=2), color =  "blue3", linetype="dashed") +
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=2), color =  "blue3", linetype="dashed") +
+  geom_smooth(data=subset(daily_aggregate, saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=2), color =  "blue3", linetype="dashed") +
+  # just Pullman
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+              mapping = aes(x=saledate,y=tot_items),
+              method = 'lm', formula = y~ns(x, df=2), color =  "darkgreen") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-05-05" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=2), color =  "darkgreen") +
+  geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-08-22"),
+              mapping = aes(x=saledate,y=tot_items), 
+              method = 'lm', formula = y~ns(x, df=2), color =  "darkgreen") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dotted", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dotted", size=0.5, colour="dimgrey") +
+  labs(title="Total Items Sold: State Dotted, Pullman Solid",
+       y = "Total Items Sold",
+       x = "Date, Summer Indicated in Bracket")
+
+
+# dots for Pullman and overall state average
+
+daily_agg_summary_vPullman <- daily_aggregate %>%
+  mutate(is_Pullman = (city=="PULLMAN")) %>%
+  group_by(saledate, is_Pullman) %>%
+  summarise(revenue = mean(revenue, na.rm=T),
+            tot_items = mean(tot_items, na.rm=T),
+            avg_price_peritem = mean(avg_price_peritem, na.rm=T),
+            perc.usable = mean(perc.usable, na.rm=T),
+            perc.edible = mean(perc.edible, na.rm=T),
+            perc.extracts = mean(perc.extracts, na.rm=T),
+            city = "State_Avg")
+
+daily_agg_summary_vPullman %>%
+  filter(!is.na(is_Pullman)) %>%
+  ggplot(aes(x=saledate, y=tot_items)) +
+  geom_point(aes(color=is_Pullman)) +
+  geom_smooth(data=subset(daily_agg_summary_vPullman, is_Pullman),
+              mapping = aes(x=saledate, y=tot_items),
+              method = 'loess', color =  "blue3", linetype="dashed") +
+  geom_smooth(data=subset(daily_agg_summary_vPullman, !is_Pullman),
+              mapping = aes(x=saledate, y=tot_items),
+              method = 'loess', color =  "red", linetype="dashed") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-06')),
+             linetype="dotted", size=1, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-22')),
+             linetype="dotted", size=1, colour="dimgrey")
+
+daily_agg_summary_vPullman %>%
+  dplyr::filter(!is.na(is_Pullman)) %>%
+  dplyr::rename(Usable = perc.usable, Edibles = perc.edible, Extracts = perc.extracts) %>%
+  tidyr::gather(product_type, perc_items_sold, 6:8) %>%
+  ggplot(aes(x=saledate, y=perc_items_sold)) +
+  geom_point(aes(color=product_type)) +
+  facet_wrap("is_Pullman") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-06')),
+             linetype="dotted", size=1, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-22')),
+             linetype="dotted", size=1, colour="dimgrey")
+
+
+daily_agg_summary_vPullman %>%
+  dplyr::filter(!is.na(is_Pullman), saledate > "2016-01-01") %>%
+  dplyr::rename(Usable = perc.usable, Edibles = perc.edible, Extracts = perc.extracts) %>%
+  tidyr::gather(product_type, perc_items_sold, 6:8) %>%
+  dplyr::filter(product_type!="Usable") %>%
+  ggplot(aes(x=saledate, y=perc_items_sold)) +
+  geom_point(aes(color=product_type)) +
+  facet_wrap("is_Pullman") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-06')),
+             linetype="dotted", size=1, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-22')),
+             linetype="dotted", size=1, colour="dimgrey")
+
+
+
+  # State aggregate
+  # geom_smooth(data=subset(daily_aggregate, saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+  #             mapping = aes(x=saledate,y=tot_items),
+  #             method = 'lm', formula = y~ns(x, df=2), color =  "blue3", linetype="dashed") +
+  # geom_smooth(data=subset(daily_aggregate, saledate >= "2016-05-05" & 
+  #                           saledate <= "2016-08-22"),
+  #             mapping = aes(x=saledate,y=tot_items), 
+  #             method = 'lm', formula = y~ns(x, df=2), color =  "blue3", linetype="dashed") +
+  # geom_smooth(data=subset(daily_aggregate, saledate >= "2016-08-22"),
+  #             mapping = aes(x=saledate,y=tot_items), 
+  #             method = 'lm', formula = y~ns(x, df=2), color =  "blue3", linetype="dashed") +
+  # # just Pullman
+  # geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-01-01" & saledate <= "2016-05-05"),
+  #             mapping = aes(x=saledate,y=tot_items),
+  #             method = 'lm', formula = y~ns(x, df=2), color =  "darkgreen") +
+  # geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-05-05" & 
+  #                           saledate <= "2016-08-22"),
+  #             mapping = aes(x=saledate,y=tot_items), 
+  #             method = 'lm', formula = y~ns(x, df=2), color =  "darkgreen") +
+  # geom_smooth(data=subset(daily_aggregate, city=="PULLMAN" & saledate >= "2016-08-22"),
+  #             mapping = aes(x=saledate,y=tot_items), 
+  #             method = 'lm', formula = y~ns(x, df=2), color =  "darkgreen") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dotted", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dotted", size=0.5, colour="dimgrey") +
+  labs(title="Total Items Sold: State Dotted, Pullman Solid",
+       y = "Total Items Sold",
+       x = "Date, Summer Indicated in Bracket")
+
+```
 
 ## Consumer Behavior in Pullman, Washington
 
@@ -909,7 +1135,7 @@ pullman_inhal_graph <- inhaltypes_pullman %>%
              linetype="dashed", size=1, colour="darkgreen") +
   labs(title="Pullman Usage by Inhalant Group Types",
        x="Sale Date",
-       y="Percent of Inhalant Sales of Each Group")
+       y="P% Inhalant Sales")
 
 
 # degrees of freedom: noncollege non urban
@@ -933,7 +1159,7 @@ nonurban_inhal_graph <- inhaltypes_noncollege_nonurban %>%
              linetype="dashed", size=1, colour="darkgreen") +
   labs(title="Noncollege-Nonurban Usage by Inhalant Group Types",
        x="Sale Date",
-       y="Percent of Inhalant Sales of Each Group")
+       y="% Inhalant Sales")
 
 bigcity_inhal_graph <- ggplot() +
   # different regression lines for spring, summer, and fall
@@ -954,11 +1180,11 @@ bigcity_inhal_graph <- ggplot() +
              linetype="dashed", size=1, colour="darkgreen") +
   labs(title="Big City Usage by Inhalant Group Types",
        x="Sale Date",
-       y="Percent of Inhalant Sales of Each Group")
+       y="% Inhalant Sales")
 
 grid.arrange(pullman_inhal_graph, nonurban_inhal_graph)
 
-grid.arrange(pullman_inhal_graph, bigcity_inhal_graph, nonurban_inhal_graph)
+grid.arrange(pullman_inhal_graph, nonurban_inhal_graph, bigcity_inhal_graph)
 ```
 
 ```{r placebocities, echo=FALSE, message=FALSE, fig.width=6, fig.height=4.5}
@@ -2014,6 +2240,10 @@ didnoncollege_perc.usable = lm(perc.usable ~ college + beforeSummer + college_be
                 data = did_pullman_noncollege)
 summary(didnoncollege_perc.usable)
 
+didnoncollege_perc.edible = lm(perc.edible ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege)
+summary(didnoncollege_perc.edible)
+
 # percent usable
 daily_aggregate_PullmanNoncollege %>%
   ggplot(aes(x=saledate, y=perc.usable)) +
@@ -2073,6 +2303,11 @@ daily_aggregate_PullmanNoncollege %>%
 didnoncollege_perc.edible = lm(perc.edible ~ college + beforeSummer + college_before,
                 data = did_pullman_noncollege)
 summary(didnoncollege_perc.edible)
+
+
+didnoncollege_perc.extracts = lm(perc.extracts ~ college + beforeSummer + college_before,
+                data = did_pullman_noncollege)
+summary(didnoncollege_perc.extracts)
 
 # percent edible
 daily_aggregate_PullmanNoncollege %>%
