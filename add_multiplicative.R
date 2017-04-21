@@ -193,8 +193,8 @@ retail.sample$retail_prodname <- as.factor(retail.sample$retail_prodname)
 retail.sample <- left_join(retail.sample, inhalantnames, by="retail_prodname")
 
 # sample for checking
-samplelist <- sample(retail.sample$retail_transactionid, 20000, replace=F)
-excel.sample <- dplyr::filter(retail, retail_transactionid %in% samplelist)
+#samplelist <- sample(retail.sample$retail_transactionid, 20000, replace=F)
+#excel.sample <- dplyr::filter(retail, retail_transactionid %in% samplelist)
 # write.table(excel.sample, file="../data/Dec2016/cleaned/testing/add_multi_sample.csv",
 #             sep=",", row.names = F)
 
@@ -254,41 +254,42 @@ retail.byquarter.all %>%
   labs(title="Relationship Between Processor and Retail Prices \nUsable & Inhalants",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
-  theme(panel.background = element_rect(fill = "dimgray"), panel.grid.major = element_line(colour = "azure2"))
+  theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
 
 retail.byquarter.bytype %>%
   dplyr::filter(quarter!="other") %>%
   dplyr::filter(retail_typename == "Usable Marijuana") %>%
   ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
-  #geom_point(alpha=0.25, color="darkgreen") + 
-  geom_point(aes(color=quarter), alpha=.9, size=3) + 
-  #geom_smooth(color="gold2", method = "lm") +
-  #facet_wrap("retail_typename") +
-  scale_colour_brewer(palette = "Reds") +
   xlim(0, 8) + ylim(0, 25) +
-  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=0.75, linetype="dashed") +
-  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
+  geom_abline(intercept = 0, slope = 1, color="grey23", size=0.75, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="grey23", size=1, linetype="dotted") +
+  geom_point(aes(color=quarter), alpha=.9, size=3) + 
+  scale_colour_brewer(palette = "Reds") +
+  annotate("text", x = 6, y = 3.5, label = "1:1 Ratio", colour="black") + 
+  annotate("text", x = 5, y = 19, label = "3:1 Ratio", colour="black") + 
   labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
-  theme(panel.background = element_rect(fill = "dimgray"), panel.grid.major = element_line(colour = "azure2"))
+  theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
 
 retail.byquarter.bytype %>%
   dplyr::filter(retail_typename == "Marijuana Extract for Inhalation",
                 !is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram), quarter!="other") %>%
   ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
   #geom_point(alpha=0.25, color="darkgreen") + 
-  geom_point(aes(color=quarter), alpha=.9, size=3) + 
+  xlim(0, 25) + ylim(0, 65) +
+  geom_abline(intercept = 0, slope = 1, color="grey23", size=0.75, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="grey23", size=1, linetype="dotted") +
   #geom_smooth(color="gold2", method = "lm") +
+  annotate("text", x = 20, y = 15, label = "1:1 Ratio", colour="black") + 
+  annotate("text", x = 14, y = 55, label = "3:1 Ratio", colour="black") + 
+  geom_point(aes(color=quarter), alpha=.9, size=3) + 
   #facet_wrap("retail_typename") +
   scale_colour_brewer(palette = "Reds") +
-  xlim(0, 25) + ylim(0, 65) +
-  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=0.75, linetype="dashed") +
-  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
-  theme(panel.background = element_rect(fill = "dimgray"), panel.grid.major = element_line(colour = "azure2"))
+  theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
 
 
 # inhalants by classifications
@@ -305,7 +306,7 @@ retail.byquarter.cartridge %>%
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, by Cartridge",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
-  theme(panel.background = element_rect(fill = "dimgray"), panel.grid.major = element_line(colour = "azure2"))
+  theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
 
 retail.byquarter.extractmethod %>%
   dplyr::filter(!is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram), quarter!="other") %>%
@@ -343,18 +344,23 @@ retail.byquarter.inhalGen %>%
   dplyr::filter(!is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram), 
                 # dropping 2015 Q2 because of high skew
                 quarter!="other", quarter!="2015 Q2") %>%
+  dplyr::mutate(inhalant_gen = factor(inhalant_gen, levels = c("Cartridge", "Oil", "Wax/Shatter/Dab/Resin", 
+                                               "Hash/Kief", "Uncategorized"))) %>%
   ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
-  geom_smooth(color="gold2", method = "lm") +
+  geom_abline(intercept = 0, slope = 1, color="gray23", size=1, linetype="dashed") +
+  geom_abline(intercept = 0, slope = 3, color="gray23", size=1, linetype="dotted") +
+  annotate("text", x = 30, y = 15, label = "1:1 Ratio", colour="black") + 
+  annotate("text", x = 18, y = 80, label = "3:1 Ratio", colour="black") + 
+  #geom_smooth(color="gold2", method = "lm") +
   geom_point(aes(color=quarter), alpha=.9, size=3) + 
   scale_colour_brewer(palette = "Reds") +
   facet_wrap("inhalant_gen") +
   xlim(0, 35) + ylim(0, 100) +
-  geom_abline(intercept = 0, slope = 1, color="darkorchid4", size=1, linetype="dashed") +
-  geom_abline(intercept = 0, slope = 3, color="darkorchid4", size=1, linetype="dotted") +
   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation, by Inhalant Category",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
-  theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
+  theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"),
+        legend.justification=c(1,0), legend.position=c(1,0))
 
 
 # plotting mark ups colored by quarter ------
