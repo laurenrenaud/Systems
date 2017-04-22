@@ -38,6 +38,8 @@ daily_aggregate_byTownType <- readr::read_csv("college_towns/daily_aggregate_byT
 
 daily_aggregate_inhaltypes_byTownType <- readr::read_csv("college_towns/daily_aggregate_inhaltypes_byTownType.csv")
 
+daily_aggregate_PullmanUrbanRestofState <- readr::read_csv("college_towns/daily_aggregate_PullmanUrbanRestofState.csv")
+
 ```
 
 
@@ -986,6 +988,95 @@ pullNCNU_usable_perc <- ggplot() +
   labs(title="", x= 'Sale Date', y = "% of Products Sold")
 
 grid.arrange(pullNCNU_usable_perc, pullNCNU_edible_perc, pullNCNU_extract_perc, ncol=3)
+
+
+### percents with dots 
+
+# percents, with dots, by product type & Pullman vs NCNU
+pullmanNCNU_compare %>%
+  filter(saledate >= "2016-01-01" & saledate < "2017-01-01" & product_type!="Usable" & perc_items_sold < 0.25) %>%
+  ggplot(aes(x=saledate, y=perc_items_sold, color=towntype_Pullman)) +
+  geom_point() +
+  geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-01-01" & saledate <= "2017-01-01" &
+                            towntype_Pullman=="Pullman" & product_type!="Usable"),
+             mapping = aes(x=saledate, y=perc_items_sold),
+             method = 'loess', color="darkblue") +
+  geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-01-01" & saledate <= "2017-01-01" &
+                            towntype_Pullman=="noncollege-nonurban" & product_type!="Usable"),
+             mapping = aes(x=saledate, y=perc_items_sold),
+             method = 'loess', color="red") +
+  # geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-05-06" & saledate <= "2016-09-21" &
+  #                           product_type=="Edibles"),
+  #             mapping = aes(x=saledate, y=perc_items_sold), 
+  #             method = 'lm', formula = y~ns(x, df=2), color="#d95f02") +
+  # geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-09-21" & saledate < "2017-01-01" &
+  #                           product_type=="Edibles"),
+  #             mapping = aes(x=saledate, y=perc_items_sold), 
+  #             method = 'lm', formula = y~ns(x, df=2), color="#d95f02") +
+  facet_grid(~product_type, scales = "free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-06')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-21')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title=" ", x= 'Sale Date', y = "% of Products Sold")
+
+
+pullmanNCNU_compare %>%
+  filter(saledate >= "2016-01-01" & saledate < "2017-01-01" & product_type=="Usable") %>%
+  ggplot(aes(x=saledate, y=perc_items_sold, color=towntype_Pullman)) +
+  geom_point() +
+  geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-01-01" & saledate <= "2017-01-01" &
+                            towntype_Pullman=="Pullman" & product_type=="Usable"),
+             mapping = aes(x=saledate, y=perc_items_sold),
+             method = 'loess', color="darkblue") +
+  geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-01-01" & saledate <= "2017-01-01" &
+                            towntype_Pullman=="noncollege-nonurban" & product_type=="Usable"),
+             mapping = aes(x=saledate, y=perc_items_sold),
+             method = 'loess', color="red") +
+  # geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-05-06" & saledate <= "2016-09-21" &
+  #                           product_type=="Edibles"),
+  #             mapping = aes(x=saledate, y=perc_items_sold), 
+  #             method = 'lm', formula = y~ns(x, df=2), color="#d95f02") +
+  # geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-09-21" & saledate < "2017-01-01" &
+  #                           product_type=="Edibles"),
+  #             mapping = aes(x=saledate, y=perc_items_sold), 
+  #             method = 'lm', formula = y~ns(x, df=2), color="#d95f02") +
+  facet_grid(~product_type, scales = "free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-06')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-21')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title=" ", x= 'Sale Date', y = "% of Products Sold")
+
+
+pullmanNCNU_compare %>%
+  filter(saledate >= "2016-01-01" & saledate < "2017-01-01" & product_type=="Usable") %>%
+  ggplot(aes(x=saledate, y=perc_items_sold, color=product_type)) +
+  geom_point() +
+  geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-01-01" & saledate <= "2017-01-01" &
+                            product_type=="Usable"),
+             mapping = aes(x=saledate, y=perc_items_sold),
+             method = 'loess', color="#d95f02") +
+  # geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-05-06" & saledate <= "2016-09-21" &
+  #                           product_type=="Edibles"),
+  #             mapping = aes(x=saledate, y=perc_items_sold), 
+  #             method = 'lm', formula = y~ns(x, df=2), color="#d95f02") +
+  # geom_smooth(data=subset(pullmanNCNU_compare, saledate >= "2016-09-21" & saledate < "2017-01-01" &
+  #                           product_type=="Edibles"),
+  #             mapping = aes(x=saledate, y=perc_items_sold), 
+  #             method = 'lm', formula = y~ns(x, df=2), color="#d95f02") +
+  facet_grid(towntype_Pullman~product_type, scales = "free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-06')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-21')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title=" ", x= 'Sale Date', y = "% of Products Sold")
 
 
 

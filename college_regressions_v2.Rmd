@@ -1,0 +1,334 @@
+---
+title: "College Town Natural Experiments"
+author: "The Mary Janes"
+date: "April, 2017"
+output:
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(tidyr)
+library(splines)
+library(knitr)
+
+# dfs for this analysis
+daily_aggregate <- readr::read_csv("college_towns/daily_aggregate.csv")
+
+daily_agg_summary <- daily_aggregate %>%
+  group_by(saledate) %>%
+  summarise(revenue = median(revenue, na.rm=T),
+            tot_items = median(tot_items, na.rm=T),
+            avg_price_peritem = median(avg_price_peritem, na.rm=T),
+            perc.usable = median(perc.usable, na.rm=T),
+            perc.edible = median(perc.edible, na.rm=T),
+            perc.extracts = median(perc.extracts, na.rm=T),
+            city = "State_Avg")
+
+daily_aggregate_bycollegeBoolean <- readr::read_csv("college_towns/daily_aggregate_bycollegeBoolean.csv")
+
+daily_aggregate_PullmanNoncollege <- readr::read_csv("college_towns/daily_aggregate_PullmanNoncollege.csv")
+
+daily_aggregate_byTownType <- readr::read_csv("college_towns/daily_aggregate_byTownType.csv")
+
+daily_aggregate_inhaltypes_byTownType <- readr::read_csv("college_towns/daily_aggregate_inhaltypes_byTownType.csv")
+
+daily_aggregate_PullmanUrbanRestofState <- readr::read_csv("college_towns/daily_aggregate_PullmanUrbanRestofState.csv")
+
+pullmanUrbanRestofState_inhalants <- readr::read_csv("college_towns/pullmanUrbanRestofState_inhalants.csv")
+
+```
+
+
+### Pullman NCNU Items by Product Type, Straight Lines
+
+```{r pullman_ncnu_items_straightlines}
+
+daily_agg_Pullman_NCNU <- daily_aggregate_PullmanUrbanRestofState %>%
+  filter(towntype=="Pullman" | towntype=="NCNU") %>%
+  rename(Usable = perc_usable,
+         Edibles = perc_edible,
+         Extracts = perc_extract,
+         Other = perc_other)
+
+items_usable <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Usable*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Usable*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Usable*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Usable", x= 'Sale Date', y = "Count of Item-Entries")
+
+
+items_edibles <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Edibles*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Edibles*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Edibles*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Edibles", x= 'Sale Date', y = "")
+
+items_extracts <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Extracts*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Extracts*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Extracts*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Extracts", x= 'Sale Date', y = "")
+
+
+grid.arrange(items_usable, items_edibles, items_extracts, ncol=3)
+
+```
+
+
+
+
+### Other College Towns by Product Type, Straight Lines
+
+```{r othercollege_items_straightlines}
+
+daily_agg_Pullman_othercollges <- daily_aggregate_PullmanUrbanRestofState %>%
+  dplyr::filter(towntype!="Big City" & towntype!="NCNU") %>%
+  rename(Usable = perc_usable,
+         Edibles = perc_edible,
+         Extracts = perc_extract,
+         Other = perc_other)
+  
+
+items_othercolleges_usable <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Usable*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Usable*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Usable*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Usable", x= 'Sale Date', y = "Count of Item-Entries")
+
+
+items_othercolleges_edibles <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Edibles*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Edibles*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Edibles*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Edibles", x= 'Sale Date', y = "")
+
+items_othercolleges_extracts <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Extracts*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Extracts*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  geom_smooth(data=subset(daily_agg_Pullman_othercollges, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Extracts*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Extracts", x= 'Sale Date', y = "")
+
+
+grid.arrange(items_othercolleges_usable, items_othercolleges_edibles, items_othercolleges_extracts, ncol=3)
+
+```
+
+
+
+
+### Extract Use as Percent, by Town Type
+
+```{r towntype_extracts}
+
+inhaltypes <- pullmanUrbanRestofState_inhalants %>%
+  dplyr::rename(`Cartridge & Oil` = perc_cartridge_oil, `Hash & Kief` = perc_hash_kief, `Uncategorized` = perc_uncategorized,
+                `Wax, Shatter, Dab, Resin` = perc_wax_shatter_resin) %>%
+  tidyr::gather(inhal_group, perc_group, 4:7) %>%
+  dplyr::mutate(inhal_group = factor(inhal_group, levels = c("Cartridge & Oil", "Wax, Shatter, Dab, Resin", 
+                                                             "Hash & Kief", "Uncategorized"))) %>%
+  dplyr::rename(`Inhalant Group` = inhal_group)
+
+ggplot() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(inhaltypes, saledate >= "2016-01-01" & saledate <="2016-12-31" &
+                            towntype!="Airway Heights" & towntype!="Ellensburg"),
+              mapping = aes(x=saledate, y=perc_group, color=`Inhalant Group`),
+              method = 'loess') + 
+  scale_colour_brewer(palette = "Set2") +
+  facet_wrap("towntype", ncol=1) +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Pullman Usage by Inhalant Group Types",
+       x="Sale Date",
+       y="Percent of Inhalant Sales of Each Group")
+
+# breaks for the regressions
+ggplot() +
+  # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(inhaltypes, saledate >= "2016-01-01" & saledate <="2016-05-06" &
+                            towntype!="Airway Heights" & towntype!="Ellensburg"),
+              mapping = aes(x=saledate, y=perc_group, color=`Inhalant Group`),
+              method = 'lm', formula = y~ns(x, df=3)) + 
+  geom_smooth(data=subset(inhaltypes, saledate >= "2016-05-06" & saledate <="2016-08-22" &
+                            towntype!="Airway Heights" & towntype!="Ellensburg"),
+              mapping = aes(x=saledate, y=perc_group, color=`Inhalant Group`),
+              method = 'lm', formula = y~ns(x, df=3)) + 
+  geom_smooth(data=subset(inhaltypes, saledate >= "2016-08-22" & saledate <="2016-12-31" &
+                            towntype!="Airway Heights" & towntype!="Ellensburg"),
+              mapping = aes(x=saledate, y=perc_group, color=`Inhalant Group`),
+              method = 'lm', formula = y~ns(x, df=3)) + 
+  scale_colour_brewer(palette = "Set2") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_y_continuous(labels = scales::percent) +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Pullman Usage by Inhalant Group Types",
+       x="Sale Date",
+       y="Percent of Inhalant Sales of Each Group")
+
+
+items_usable <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Usable*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Usable*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Usable*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#1b9e77") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Usable", x= 'Sale Date', y = "Count of Item-Entries")
+
+
+items_edibles <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Edibles*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Edibles*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Edibles*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#d95f02") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Edibles", x= 'Sale Date', y = "")
+
+items_extracts <- ggplot() +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-01-01" & saledate <= "2016-05-06"),
+              mapping = aes(x=saledate, y=Extracts*tot_items),
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-05-06" & saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=Extracts*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  geom_smooth(data=subset(daily_agg_Pullman_NCNU, saledate >= "2016-08-22" & saledate < "2017-01-01"),
+              mapping = aes(x=saledate, y=Extracts*tot_items), 
+              method = 'lm', formula = y~ns(x, df=1), color="#7570b3") +
+  facet_wrap("towntype", ncol=1, scales="free") +
+  scale_x_date(date_breaks = "3 month", date_labels = "%b") +
+  # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-5-6')),
+             linetype="dashed", size=0.5, colour="dimgrey")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-8-22')),
+             linetype="dashed", size=0.5, colour="dimgrey") +
+  labs(title="Extracts", x= 'Sale Date', y = "")
+
+
+grid.arrange(items_usable, items_edibles, items_extracts, ncol=3)
+
+# table summarizing extract use by town type
+# during spring semester
+
+pullmanUrbanRestofState_inhalants %>%
+  dplyr::filter(saledate >= "2016-01-01", saledate < "2016-05-01") %>%
+  dplyr::group_by(towntype) %>%
+  dplyr::summarise(
+    `Cartridge & Oil` = round(mean(perc_cartridge_oil*100, na.rm=T),1),
+    `Hash & Kief` = round(mean(perc_hash_kief*100, na.rm=T),1),
+    `Wax, Shatter, Dab` = round(mean(perc_wax_shatter_resin*100, na.rm=T), 1),
+    `Uncategorized` = round(mean(perc_uncategorized*100, na.rm=T),1)
+  ) %>%
+  kable()
+```

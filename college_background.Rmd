@@ -37,7 +37,7 @@ retail.select <- retail %>%
                 # big city variable
                 bigcity = city %in% c("SEATTLE", "SPOKANE", "TACOMA", "VANCOUVER", "BELLEVUE", "EVERETT",
                                       "YAKIMA", "RENTON"),
-                towntype = ifelse(collegetown, "college",
+                towntype = ifelse(city == "PULLMAN", "Pullman",
                                   ifelse(bigcity, "bigcity", "noncollege-nonurban")),
                 # incorporate sales tax
                 price_x = ifelse(saledate >= "2015-07-01", price*1.37, price)) %>%
@@ -46,6 +46,31 @@ retail.select <- retail %>%
   dplyr::select(retail_id = id, transactionid, location, city, collegetown, bigcity, towntype,
                 price_x, saledate, inv_type_name, inventoryid) %>%
   dplyr::left_join(select(inventory, id, productname), by=c("inventoryid" = "id"))
+
+
+
+retail.select_v2Pullman <- retail %>%
+  # going back to get two summers
+   dplyr::filter(saledate >= "2015-05-15") %>%
+  # get cities for retail locations
+  dplyr::left_join(select(locations, id, city), by=c("location" = "id")) %>%
+  dplyr::mutate(# big city variable
+                bigcity = city %in% c("SEATTLE", "SPOKANE", "TACOMA", "VANCOUVER", "BELLEVUE", "EVERETT",
+                                      "YAKIMA", "RENTON"),
+                towntype = ifelse(city == "PULLMAN", "Pullman",
+                                  ifelse(city=="ELLENSBURG", "Ellensburg",
+                                         ifelse(city=="AIRWAY HEIGHTS", "Airway Heights",
+                                                ifelse(bigcity, "Big City",
+                                                       "NCNU")))),
+                # incorporate sales tax
+                price_x = ifelse(saledate >= "2015-07-01", price*1.37, price)) %>%
+  # bring in inventory type names
+  dplyr::left_join(inv.types, by="inventorytype") %>%
+  dplyr::select(retail_id = id, transactionid, location, city, bigcity, towntype,
+                price_x, saledate, inv_type_name, inventoryid) %>%
+  dplyr::left_join(select(inventory, id, productname), by=c("inventoryid" = "id"))
+
+
 
 daily_aggregate <- retail.select %>%
   dplyr::group_by(city, saledate) %>%
@@ -118,6 +143,47 @@ daily_aggregate_inhaltypes_byTownType <- retail.select %>%
   ) %>%
   filter(revenue >= 0)
 
+
+##### dataframe for Jon
+daily_aggregate_PullmanUrbanRestofState <- retail.select_v2Pullman %>%
+  dplyr::mutate(product_group = ifelse(inv_type_name=="Usable Marijuana", "Usable",
+                                       ifelse(inv_type_name=="Marijuana Extract for Inhalation", "Extracts",
+                                              ifelse(inv_type_name=="Liquid Marijuana Infused Edible" | 
+                                                       inv_type_name=="Solid Marijuana Infused Edible", "Edibles",
+                                                     "Other")))) %>%
+  dplyr::group_by(towntype, saledate) %>%
+  dplyr::summarise(
+    revenue = sum(price_x, na.rm = T),
+    tot_items = length(retail_id),
+    avg_price_peritem = revenue / tot_items,
+    perc_usable = sum(product_group=="Usable", na.rm = T) / tot_items,
+    perc_extract = sum(product_group == "Extracts", na.rm = T) / tot_items,
+    perc_edible = sum(product_group == "Edibles", na.rm = T) / tot_items,
+    perc_other= sum(product_group == "Other", na.rm = T) / tot_items
+  ) %>%
+  dplyr::filter(revenue >= 0) %>%
+  dplyr::arrange(saledate, towntype)
+
+
+source("categorization_function.R")
+inhalnames <- as.data.frame(unique(retail.select_v2Pullman$productname[retail.select_v2Pullman$inv_type_name=="Marijuana Extract for Inhalation"]))
+colnames(inhalnames) <- "productname"
+inhalnames$inhal_types <- as.factor(sapply(as.character(inhalnames$productname), categorizeNames))
+inhalnames$inhal_groups <- as.factor(sapply(as.character(inhalnames$inhal_types), groupProductTypes))
+retail.select_v2Pullman$productname <- as.factor(retail.select_v2Pullman$productname)
+retail.select_v2Pullman <- left_join(retail.select_v2Pullman, inhalnames, by="productname")
+
+pullmanUrbanRestofState_inhalants <- retail.select_v2Pullman %>%
+  dplyr::filter(inv_type_name=="Marijuana Extract for Inhalation") %>%
+  dplyr::group_by(towntype, saledate) %>%
+  dplyr::summarise(
+    tot_items = length(retail_id),
+    perc_cartridge_oil = sum(inhal_groups=="Cartridge/Oil", na.rm = T) / tot_items,
+    perc_hash_kief = sum(inhal_groups == "Hash/Kief", na.rm = T) / tot_items,
+    perc_wax_shatter_resin = sum(inhal_groups == "Wax/Shatter/Dab/Resin", na.rm = T) / tot_items,
+    perc_uncategorized= sum(inhal_groups == "Uncategorized", na.rm = T) / tot_items
+  )
+
 # write out
 write.table(daily_aggregate, file="college_towns/daily_aggregate.csv",
             row.names=F, col.names=T, sep=",")
@@ -130,6 +196,14 @@ write.table(daily_aggregate_byTownType,
 write.table(daily_aggregate_inhaltypes_byTownType,
             file="college_towns/daily_aggregate_inhaltypes_byTownType.csv",
             row.names=F, col.names=T, sep=",")
+write.table(daily_aggregate_PullmanUrbanRestofState,
+            file="college_towns/daily_aggregate_PullmanUrbanRestofState.csv",
+            row.names=F, col.names=T, sep=",")
+write.table(pullmanUrbanRestofState_inhalants,
+            file="college_towns/pullmanUrbanRestofState_inhalants.csv",
+            row.names=F, col.names=T, sep=",")
+
+
 ```
 
 ```{r plots_college_summer}
@@ -422,6 +496,10 @@ daily_aggregate %>%
              linetype="dashed", size=1, colour="darkgreen") +
   labs(title="Percent of Sales that are Usable, DES MOINES")
 
+
+
+# items sold, Pullman, NCNU, summer----------
+daily_aggregate_PullmanUrbanRestofState
 
 
 ```
