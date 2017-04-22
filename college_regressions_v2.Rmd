@@ -206,9 +206,9 @@ grid.arrange(items_othercolleges_usable, items_othercolleges_edibles, items_othe
 
 inhaltypes <- pullmanUrbanRestofState_inhalants %>%
   dplyr::rename(`Cartridge & Oil` = perc_cartridge_oil, `Hash & Kief` = perc_hash_kief, `Uncategorized` = perc_uncategorized,
-                `Wax, Shatter, Dab, Resin` = perc_wax_shatter_resin) %>%
+                `Wax, Shatter, Resin` = perc_wax_shatter_resin) %>%
   tidyr::gather(inhal_group, perc_group, 4:7) %>%
-  dplyr::mutate(inhal_group = factor(inhal_group, levels = c("Cartridge & Oil", "Wax, Shatter, Dab, Resin", 
+  dplyr::mutate(inhal_group = factor(inhal_group, levels = c("Cartridge & Oil", "Wax, Shatter, Resin", 
                                                              "Hash & Kief", "Uncategorized"))) %>%
   dplyr::rename(`Inhalant Group` = inhal_group)
 
