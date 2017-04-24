@@ -205,8 +205,8 @@ grid.arrange(items_othercolleges_usable, items_othercolleges_edibles, items_othe
 ```{r towntype_extracts}
 
 inhaltypes <- pullmanUrbanRestofState_inhalants %>%
-  dplyr::rename(`Cartridge & Oil` = perc_cartridge_oil, `Hash & Kief` = perc_hash_kief, `Uncategorized` = perc_uncategorized,
-                `Wax, Shatter, Resin` = perc_wax_shatter_resin) %>%
+  dplyr::rename(`Cartridge` = perc_cartridge, `Oil` = perc_oil, `Hash & Kief` = perc_hash_kief,
+                `Wax, Shatter, Resin` = perc_wax_shatter_resin, `Uncategorized` = perc_uncategorized) %>%
   tidyr::gather(inhal_group, perc_group, 4:7) %>%
   dplyr::mutate(inhal_group = factor(inhal_group, levels = c("Cartridge & Oil", "Wax, Shatter, Resin", 
                                                              "Hash & Kief", "Uncategorized"))) %>%
@@ -318,15 +318,28 @@ items_extracts <- ggplot() +
 
 grid.arrange(items_usable, items_edibles, items_extracts, ncol=3)
 
-# table summarizing extract use by town type
-# during spring semester
+# table summarizing extract use by town type ------
 
+# during spring semester
 pullmanUrbanRestofState_inhalants %>%
   dplyr::filter(saledate >= "2016-01-01", saledate < "2016-05-01") %>%
   dplyr::group_by(towntype) %>%
   dplyr::summarise(
-    `Cartridge & Oil` = round(mean(perc_cartridge_oil*100, na.rm=T),1),
+    `Cartridge` = round(mean(perc_cartridge*100, na.rm=T),1),
+    `Oil` = round(mean(perc_oil*100, na.rm=T),1),
     `Hash & Kief` = round(mean(perc_hash_kief*100, na.rm=T),1),
+    `Wax, Shatter, Dab` = round(mean(perc_wax_shatter_resin*100, na.rm=T), 1),
+    `Uncategorized` = round(mean(perc_uncategorized*100, na.rm=T),1)
+  ) %>%
+  kable()
+
+# during summer
+pullmanUrbanRestofState_inhalants %>%
+  dplyr::filter(saledate >= "2016-06-01", saledate < "2016-08-01") %>%
+  dplyr::group_by(towntype) %>%
+  dplyr::summarise(
+    `Cartridge` = round(mean(perc_cartridge*100, na.rm=T),1),
+    `Oil` = round(mean(perc_oil*100, na.rm=T),1),
     `Wax, Shatter, Dab` = round(mean(perc_wax_shatter_resin*100, na.rm=T), 1),
     `Uncategorized` = round(mean(perc_uncategorized*100, na.rm=T),1)
   ) %>%

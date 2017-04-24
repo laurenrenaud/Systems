@@ -169,7 +169,8 @@ source("categorization_function.R")
 inhalnames <- as.data.frame(unique(retail.select_v2Pullman$productname[retail.select_v2Pullman$inv_type_name=="Marijuana Extract for Inhalation"]))
 colnames(inhalnames) <- "productname"
 inhalnames$inhal_types <- as.factor(sapply(as.character(inhalnames$productname), categorizeNames))
-inhalnames$inhal_groups <- as.factor(sapply(as.character(inhalnames$inhal_types), groupProductTypes))
+# note here: use either groupProductTypesOilSep or groupProductTypes as function
+inhalnames$inhal_groups <- as.factor(sapply(as.character(inhalnames$inhal_types), groupProductTypesOilSep))
 retail.select_v2Pullman$productname <- as.factor(retail.select_v2Pullman$productname)
 retail.select_v2Pullman <- left_join(retail.select_v2Pullman, inhalnames, by="productname")
 
@@ -178,7 +179,8 @@ pullmanUrbanRestofState_inhalants <- retail.select_v2Pullman %>%
   dplyr::group_by(towntype, saledate) %>%
   dplyr::summarise(
     tot_items = length(retail_id),
-    perc_cartridge_oil = sum(inhal_groups=="Cartridge/Oil", na.rm = T) / tot_items,
+    perc_cartridge = sum(inhal_groups=="Cartridge", na.rm = T) / tot_items,
+    perc_oil = sum(inhal_groups=="Oil", na.rm = T) / tot_items,
     perc_hash_kief = sum(inhal_groups == "Hash/Kief", na.rm = T) / tot_items,
     perc_wax_shatter_resin = sum(inhal_groups == "Wax/Shatter/Dab/Resin", na.rm = T) / tot_items,
     perc_uncategorized= sum(inhal_groups == "Uncategorized", na.rm = T) / tot_items
