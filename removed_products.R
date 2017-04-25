@@ -23,6 +23,12 @@ removereasons <- unique(inventory$removereason)
 removereasons_268 <- unique(inventory$removereason[inventory$location==268])
 #write(removereasons, file="../data/Dec2016/cleaned/testing/removereasons_268.txt")
 
+# count of removed items
+sum(!is.na(inventory$removereason)) / nrow
+# weight of removed items
+inventory$usableweight <- as.numeric(inventory$usableweight)
+sum(inventory$usableweight[!is.na(inventory$removereason)], na.rm=T)
+
 # gets summary for all entities, not filtered to remove zeros
 removedproduct <- inventory %>%
   # one row per location
@@ -36,8 +42,8 @@ removedproduct <- inventory %>%
   # get percentile rank using total inventory to rank
   dplyr::mutate(marketsharerank = rank(inv_total)/ length(inv_total)) %>%
   #filter(percremoved > 0) %>%
-  dplyr::arrange(desc(percremoved_total)) %>%
-  dplyr::left_join(loc.simp, by=c("location" = "location_id"))
+  dplyr::left_join(loc.simp, by=c("location" = "location_id")) %>%
+  dplyr::arrange(status, desc(percremoved_total))
 #write.table(removedproduct, file="../data/Dec2016/cleaned/samples/removed_product.csv", row.names=F, sep=",")
 
 # plot histogram/density of % of product removed by open/clsoed status
@@ -45,14 +51,15 @@ removedproduct %>%
   # keep only those that are open or closed
   # this data has one that's pending and 2 that are NA
   filter(!is.na(status), status != "PENDING (ISSUED)") %>%
-  ggplot(aes(x=percremoved_total, color=status, fill=status)) +
+  rename(`Location Status` = status) %>%
+  ggplot(aes(x=percremoved_total, color=`Location Status`, fill=`Location Status`)) +
   geom_density(alpha=0.45) +
   # fill colors
   scale_fill_manual(values=brewer.pal(3,"Dark2")) +
   # outline colors
   scale_color_manual(values=c("gray47", "gray47")) +
   labs(
-    title="Percent of Product Removed \nby Store Status",
+    title="Percent of Product Removed \nby Location Status",
     x="Percent Removed",
     y="Density"
   ) +

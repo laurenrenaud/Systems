@@ -14,7 +14,7 @@ inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
 inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
 # convert UNIX time
 inventory$inv_date <- as.POSIXct(inventory$sessiontime,
-                                    origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
+                                 origin = "1970-01-01", tz="America/Los_Angeles") # LA = PST
 inventory$inv_date <- as.Date(inventory$inv_date)
 # add in inventory type names
 inventory <- left_join(inventory, inventory.types, by="inventorytype")
@@ -46,7 +46,7 @@ transfers.select <- transfers.select %>%
   rename(trans_invtypename = inv_type_name)
 # get location names
 loc.name.city <- select(locations, trans_name = name, trans_license = licensenum, location_id,
-                              trans_city = city, trans_loctype = locationtypeNames)
+                        trans_city = city, trans_loctype = locationtypeNames)
 # join in some selected location infomation
 transfers.select <- transfers.select %>%
   left_join(loc.name.city, by=c("trans_location" = "location_id"))
@@ -99,7 +99,7 @@ proc.retail.clean <- process.to.retail %>%
 ## cleaning dispensing for comparing
 dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
 dispensing$saletime <- as.Date(as.POSIXct(dispensing$sessiontime,
-                                                 origin = "1970-01-01", tz="America/Los_Angeles"))
+                                          origin = "1970-01-01", tz="America/Los_Angeles"))
 # editing for post July tax change
 # dispensing$price_x <- ifelse(dispensing$saletime >= "2015-07-01", 
 #                              dispensing$price*1.37, 
@@ -127,17 +127,18 @@ retail.test <- dispensing %>%
 
 
 dispensing.select <- dplyr::select(dispensing, dispensingid = id, weight, saletime = sessiontime, 
-                            price, inventorytype, location)
+                                   price, inventorytype, location)
 
 dispensing.select$saletime <- as.Date(as.POSIXct(dispensing.select$saletime,
-                                          origin = "1970-01-01", tz="America/Los_Angeles"))
+                                                 origin = "1970-01-01", tz="America/Los_Angeles"))
 
 dispensing.select$price_x <- ifelse(dispensing.select$saletime >= "2015-07-01", 
                                     dispensing.select$price*1.37, 
                                     dispensing.select$price)
 
-
-
+## dispening.select not working, running on sample:
+dispensing.list <- sample(dispensing.select$dispensingid, 100000, replace=F)
+dispensing.select <- dplyr::filter(dispensing.select, dispensingid %in% dispensing.list)
 
 # overall comparision, without time
 avg.saleprice <- dispensing.select %>%
@@ -213,7 +214,7 @@ avg.sale.month %>%
   tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
   left_join(inventory.types, by="inventorytype") %>%
   filter(!is.na(inventorytype), inv_type_name!="Capsule", inv_type_name!="Suppository",
-                inv_type_name!="Tincture") %>%
+         inv_type_name!="Tincture") %>%
   ggplot(aes(x=month, y=avg_price, color=supplystep)) +
   geom_line() +
   facet_wrap("inv_type_name") +
@@ -225,24 +226,27 @@ cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2",
 avg.sale.month %>%
   left_join(avg.proc.month, by=c("monthjoin", "inventorytype" = "trans_invtype")) %>%
   # needed to drop and rename some variables because of the weird join
-  select(inventorytype, month = monthyear.x, avg_saleprice, avg_processorprice) %>%
+  select(inventorytype, month = monthyear.x, Retail = avg_saleprice, Processor = avg_processorprice) %>%
   # gather so we get one value per row
-  tidyr::gather(supplystep, avg_price, c(avg_saleprice, avg_processorprice)) %>%
+  tidyr::gather(supplystep, avg_price, c(Retail, Processor)) %>%
+  dplyr::filter(month < "2017-01-01") %>%
+  dplyr::mutate(supplystep = factor(supplystep, levels = c("Retail", "Processor"))) %>%
   left_join(inventory.types, by="inventorytype") %>%
   filter(inv_type_name=="Usable Marijuana" | inv_type_name=="Marijuana Extract for Inhalation" |
-         inv_type_name=="Solid Marijuana Infused Edible") %>%
-  ggplot(aes(x=month, y=avg_price, color=supplystep)) +
-  scale_color_manual(values=c(cbPalette[2], cbPalette[3])) +
+           inv_type_name=="Solid Marijuana Infused Edible") %>%
+  rename(`Supply Step` = supplystep) %>%
+  ggplot(aes(x=month, y=avg_price, color=`Supply Step`)) +
+  scale_color_manual(values=c("#d95f02", "#7570b3")) +
   geom_line(size=1.5) +
   facet_wrap("inv_type_name") +
   theme(legend.position=c(0.9,0.9), legend.justification = c(1,1)) +
   labs(title="Avg Sale and Producer Prices \nfor Top Types",
-       x="Month",
-       y="Average Price") +
+       x="Sale Month",
+       y="Average Price Per Item") +
   geom_line(size=1.5) +
   facet_wrap("inv_type_name") +
   theme(legend.position=c(0.9,0.9), legend.justification = c(1,1))
-  
+
 ## line graph of sale price and producer price, over time
 ## for only useable, inhalation, edibles (solid)
 ## ratio of retail / wholesale

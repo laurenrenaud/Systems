@@ -344,13 +344,13 @@ retail.byquarter.inhalGen %>%
   dplyr::filter(!is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram), 
                 # dropping 2015 Q2 because of high skew
                 quarter!="other", quarter!="2015 Q2") %>%
-  dplyr::mutate(inhalant_gen = factor(inhalant_gen, levels = c("Cartridge", "Oil", "Wax/Shatter/Dab/Resin", 
+  dplyr::mutate(inhalant_gen = factor(inhalant_gen, levels = c("Cartridge", "Oil", "Wax/Shatter/Resin", 
                                                "Hash/Kief", "Uncategorized"))) %>%
   ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
   geom_abline(intercept = 0, slope = 1, color="gray23", size=1, linetype="dashed") +
   geom_abline(intercept = 0, slope = 3, color="gray23", size=1, linetype="dotted") +
-  annotate("text", x = 30, y = 15, label = "1:1 Ratio", colour="black") + 
-  annotate("text", x = 18, y = 80, label = "3:1 Ratio", colour="black") + 
+  #annotate("text", x = 30, y = 15, label = "1:1 Ratio", colour="black") + 
+  #annotate("text", x = 18, y = 80, label = "3:1 Ratio", colour="black") + 
   #geom_smooth(color="gold2", method = "lm") +
   geom_point(aes(color=quarter), alpha=.9, size=3) + 
   scale_colour_brewer(palette = "Reds") +

@@ -82,7 +82,7 @@ groupProductTypes <- function(productType){
   }
   
   else if(productType=="Wax" | productType=="Shatter" | productType=="Dab" | productType=="Resin") {
-    return("Wax/Shatter/Dab/Resin")
+    return("Wax/Shatter/Resin")
   }
   
   else return("Uncategorized")
@@ -108,7 +108,7 @@ groupProductTypesOilSep <- function(productType){
   }
   
   else if(productType=="Wax" | productType=="Shatter" | productType=="Dab" | productType=="Resin") {
-    return("Wax/Shatter/Dab/Resin")
+    return("Wax/Shatter/Resin")
   }
   
   else return("Uncategorized")
@@ -116,7 +116,7 @@ groupProductTypesOilSep <- function(productType){
 
 
 
-groupProcessorProductTypes <- function(productType){
+groupAllProductTypes <- function(productType){
   #' Takes product type and categorizes it into a 
   #' product category grouping
   #' @param productType  A string of  product type
@@ -153,8 +153,10 @@ groupProcessorProductTypes <- function(productType){
     return("Topical/Capsule/Tincture/Suppository")
   }
   else if(productType=="Marijuana Mix" | productType=="Marijuana Mix Package" | productType=="Marijuana Mix Infused") {
-    return("Topical/Capsule/Tincture/Suppository")
+    return("Mix Package")
   }
-  
+  else if(is.na(productType)) {
+    return("Uncategorized")
+  }
   else return("Uncategorized")
 }
