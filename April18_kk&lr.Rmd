@@ -1,0 +1,479 @@
+---
+title: "Sys Project"
+author: "Yilun Bao"
+date: 'January 19 2017'
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+#### **Data Preview & Preprocessing**
+
+```{r}
+# Import Retail Analysis dataset.
+# retail.pre <- read.csv("border_stores.csv", header=TRUE)
+# idaho <- read.csv("idaho_border.csv", header = TRUE)
+# oregon <- read.csv("oregon_border.csv", header = TRUE)
+
+# Import packages.
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+library(reshape2)
+#library(MASS)
+#library(caret)
+
+library(lubridate) #date-time stuff
+#library(splines)
+#library(hexbin) #geom_hexbin
+#library(broom)
+
+# Set the scientific notation.
+# options(scipen = 7)
+```
+  
+
+April 18, 2017
+
+```{r}
+# Import the dataset
+trans <- read.csv("daily_aggregate.csv", header = TRUE)
+trans$saledate <- as.Date(trans$saledate)
+
+# Get the non-college non-urban aggregation
+ncnu <- read.csv("daily_aggregate_byTownType.csv", header = TRUE)
+ncnu <- ncnu[which(ncnu$towntype_Pullman == "noncollege-nonurban"), ]
+colnames(ncnu) <- c("city", "saledate", "revenue", "tot_items", "avg_price_peritem", "perc.usable", "perc.edible", "perc.extracts")
+ncnu$saledate <- as.Date(ncnu$saledate)
+```
+
+
+Ellensburg
+
+```{r}
+# Extract Ellensburg
+ellensburg <- trans[which(trans$city == "ELLENSBURG"), c("city", "saledate", "revenue", "tot_items", "avg_price_peritem", "perc.usable", "perc.edible", "perc.extracts")]
+ellensburg.fg1 <- rbind(ncnu, ellensburg)
+
+# Create the graph
+# Usable
+ellensburg.usable <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-19"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-08-19" & 
+                            saledate <= "2016-09-21"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-09-21"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-21')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Usable", x= 'Sale Date', y = "")
+
+# Extracts
+ellensburg.extracts <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-19"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-08-19" & 
+                            saledate <= "2016-09-21"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-09-21"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city,nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-21')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Extracts", x= 'Sale Date', y = '')
+
+# Edible
+ellensburg.edible <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-19"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-08-19" & 
+                            saledate <= "2016-09-21"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(ellensburg.fg1, saledate >= "2016-09-21"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city,nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-21')),
+             linetype="dashed", size=1, colour="darkgreen") +
+  labs(title="Edible", x= 'Sale Date', y = '')
+
+# Put 3 graphs together
+grid.arrange(ellensburg.usable, ellensburg.extracts, ellensburg.edible, ncol = 3)
+
+```
+
+
+Walla Walla
+
+```{r}
+# Extract Walla Walla 
+walla <- trans[which(trans$city == "WALLA WALLA"), c("city", "saledate", "revenue", "tot_items", "avg_price_peritem", "perc.usable", "perc.edible", "perc.extracts")]
+walla.fg1 <- rbind(ncnu, walla)
+
+
+# Walla Walla University
+# '2016-08-12' ~ '2016-08-26', '2016-09-26'
+# Whitman College
+# '2016-05-17', '2016-08-29'
+
+# Create the graph
+# Usable
+walla.usable <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-05-17"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-05-17" &
+                            saledate <= "2016-08-26"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items),
+              method = 'lm',color =  "#7570b3") + 
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-08-26" & 
+                            saledate <= "2016-09-26"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-09-26"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-17')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-26')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-26')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Usable", x= 'Sale Date', y = "")
+
+# Extracts
+walla.extracts <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-05-17"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-05-17" &
+                            saledate <= "2016-08-26"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items),
+              method = 'lm',color =  "#7570b3") + 
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-08-26" & 
+                            saledate <= "2016-09-26"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-09-26"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-17')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-26')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-26')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Extracts", x= 'Sale Date', y = '')
+
+# Edible
+walla.edible <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-05-17"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-05-17" &
+                            saledate <= "2016-08-26"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items),
+              method = 'lm',color =  "#7570b3") + 
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-08-26" & 
+                            saledate <= "2016-09-26"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(walla.fg1, saledate >= "2016-09-26"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-05-17')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-26')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-26')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Edible", x= 'Sale Date', y = '')
+
+# Put 3 graphs together
+grid.arrange(walla.usable, walla.extracts, walla.edible, ncol = 3)
+
+```
+
+
+Wenatchee
+
+```{r}
+# Extract Wenatchee
+wenatchee <- trans[which(trans$city == "WENATCHEE"), c("city", "saledate", "revenue", "tot_items", "avg_price_peritem", "perc.usable", "perc.edible", "perc.extracts")]
+wenatchee.fg1 <- rbind(ncnu, wenatchee)
+
+# Create the graph
+# Usable
+wenatchee.usable <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-19"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-08-19" & 
+                            saledate <= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Usable", x= 'Sale Date', y = "")
+
+# Extracts
+wenatchee.extracts <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-19"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-08-19" & 
+                            saledate <= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Extracts", x= 'Sale Date', y = '')
+
+# Edible
+wenatchee.edible <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-19"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-08-19" & 
+                            saledate <= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(wenatchee.fg1, saledate >= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Edible", x= 'Sale Date', y = '')
+
+# Put 3 graphs together
+grid.arrange(wenatchee.usable, wenatchee.extracts, wenatchee.edible, ncol = 3)
+
+```
+
+
+Port Angeles - Peninsula College - community college
+
+```{r}
+# Extract Port Angeles
+portangel <- trans[which(trans$city == "PORT ANGELES"), c("city", "saledate", "revenue", "tot_items", "avg_price_peritem", "perc.usable", "perc.edible", "perc.extracts")]
+portangel.fg1 <- rbind(ncnu, portangel)
+
+# Create the graph
+# Usable
+portangel.usable <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-18"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-08-18" & 
+                            saledate <= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-18')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Usable", x= 'Sale Date', y = "")
+
+# Extracts
+portangel.extracts <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-18"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-08-18" & 
+                            saledate <= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-18')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Extracts", x= 'Sale Date', y = '')
+
+# Edible
+portangel.edible <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-08-18"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-08-18" & 
+                            saledate <= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-09-19"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-18')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Edible", x= 'Sale Date', y = '')
+
+# Put 3 graphs together
+grid.arrange(portangel.usable, portangel.extracts, portangel.edible, ncol = 3)
+
+```
+
+
+Airway Heights - Eastern Washington University
+
+```{r}
+# Extract Airway Heights
+airway <- trans[which(trans$city == "AIRWAY HEIGHTS"), c("city", "saledate", "revenue", "tot_items", "avg_price_peritem", "perc.usable", "perc.edible", "perc.extracts")]
+airway.fg1 <- rbind(ncnu, airway)
+
+# Create the graph
+# Usable
+airway.usable <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-07-29"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-07-29" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-08-22"),
+              mapping = aes(x=saledate, y=perc.usable*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-07-29')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-22')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Usable", x= 'Sale Date', y = "")
+
+# Extracts
+airway.extracts <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-07-29"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-07-29" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-08-22"),
+              mapping = aes(x=saledate, y=perc.extracts*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-07-29')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-22')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Extracts", x= 'Sale Date', y = '')
+
+# Edible
+airway.edible <- ggplot() +
+   # different regression lines for spring, summer, and fall
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-01-01" &
+                            saledate <= "2016-07-29"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items),
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(airway.fg1, saledate >= "2016-07-29" & 
+                            saledate <= "2016-08-22"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+  geom_smooth(data=subset(portangel.fg1, saledate >= "2016-08-22"),
+              mapping = aes(x=saledate, y=perc.edible*tot_items), 
+              method = 'lm',color =  "#7570b3") +
+    facet_wrap(~city, nrow=2,scales = "free_y") +
+    # add lines to designate summer
+  geom_vline(xintercept= as.numeric(as.Date('2016-08-18')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  geom_vline(xintercept= as.numeric(as.Date('2016-09-19')),
+             linetype="dashed", size=1, colour="darkgreen")+
+  labs(title="Edible", x= 'Sale Date', y = '')
+
+# Put 3 graphs together
+grid.arrange(portangel.usable, portangel.extracts, portangel.edible, ncol = 3)
+
+```
+
+
+
