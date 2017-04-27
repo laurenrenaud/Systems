@@ -1,10 +1,12 @@
+# references at bottom
+
 #create search terms for each product type
-cartridge.strings <- "cart|vap|vc|pen|refill|juju|joint"
+cartridge.strings <- "cart|vap|vc|pen|refill|juju|joint|atomizer"
 oil.strings <- "oil|rso|eso"
 hash.strings <- "hash"
 kief.strings <- "kief|keif"
-wax.strings <- "wax"
-shatter.strings <- "shatter"
+wax.strings <- "wax|crumble|budder"
+shatter.strings <- "shatter|snap"
 dab.strings <-"dab"
 resin.strings <- "resin|rosin"
 
@@ -17,51 +19,53 @@ categorizeNames <- function(productName){
   # first check for cartridges. allow for oil to be in product name so that 
   # for example "oil cartridge" will be classified as a cartridge
   if(grepl( cartridge.strings, productName, ignore.case = T) == TRUE & 
-     grepl(paste(hash.strings, kief.strings, wax.strings,shatter.strings, dab.strings, 
+     # allows for dab and oil strings
+     grepl(paste(hash.strings, kief.strings, wax.strings,shatter.strings, 
                  resin.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
     return("Cartridge")
   }
   # now check for oil products. allow for hash to also be in product name so that "hash oil" is classified as oil
   else if(grepl(oil.strings, productName, ignore.case = T) == TRUE & 
-     grepl(paste(hash.strings, kief.strings, wax.strings,shatter.strings, dab.strings, resin.strings, sep = "|"), 
+          # allows for dab strings and hash strings
+     grepl(paste(hash.strings, kief.strings, wax.strings,shatter.strings, resin.strings, sep = "|"), 
            productName, ignore.case = T) == FALSE) {
     return("Oil")
   }
-  # check for hash products. Allow for no overlap with other products
+  # check for hash products. Allow for no overlap with other products except "dab"
   else if(grepl( hash.strings, productName, ignore.case = T) == TRUE & 
           grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, 
-                      dab.strings, resin.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
+                      resin.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
     return("Hash")
   }
-  # check for kief products. Allow for no overlap with other products
+  # check for kief products. Allow for no overlap with other products except "dab"
   else if(grepl( kief.strings, productName, ignore.case = T) == TRUE & 
-          grepl(paste(cartridge.strings, hash.strings,oil.strings, wax.strings,shatter.strings, dab.strings, 
+          grepl(paste(cartridge.strings, hash.strings,oil.strings, wax.strings,shatter.strings, 
                       resin.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
     return("Kief")
   }
-  # check for wax products. Allow for no overlap with other products
+  # check for wax products. Allow for no overlap with other products except "dab"
   else if (grepl( wax.strings, productName, ignore.case = T) == TRUE & 
            grepl(paste(cartridge.strings, kief.strings,oil.strings, hash.strings,shatter.strings, dab.strings, 
                        resin.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
     return("Wax")
   }
-  #check for shatter products. Allow for no overlap with other products
+  #check for shatter products. Allow for no overlap with other products except "dab"
   else if (grepl( shatter.strings, productName, ignore.case = T) == TRUE & 
-           grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings, hash.strings, dab.strings, 
+           grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings, hash.strings, 
                        resin.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
     return("Shatter")
+  }
+  #check for resin products. Allow for no overlap with other products except "dab"
+  else if (grepl( resin.strings, productName, ignore.case = T) == TRUE & 
+           grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, 
+                       hash.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
+    return("Resin")
   }
   #check for dab products. Allow for no overlap with other products
   else if (grepl( dab.strings, productName, ignore.case = T) == TRUE & 
            grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, hash.strings, 
                        resin.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
     return("Dab")
-  }
-  #check for resin products. Allow for no overlap with other products
-  else if (grepl( resin.strings, productName, ignore.case = T) == TRUE & 
-           grepl(paste(cartridge.strings, kief.strings,oil.strings, wax.strings,shatter.strings, dab.strings, 
-                       hash.strings, sep = "|"), productName, ignore.case = T) == FALSE) {
-    return("Resin")
   }
   else return("Uncategorized")
 }
@@ -160,3 +164,8 @@ groupAllProductTypes <- function(productType){
   }
   else return("Uncategorized")
 }
+
+
+# sources
+# http://www.westword.com/marijuana/concentrate-heres-the-difference-between-shatter-budder-crumble-and-more-8437217
+
