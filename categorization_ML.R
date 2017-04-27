@@ -15,6 +15,32 @@ tests <- rbind(micro, moisture, solvent)
 labkey <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_samples.csv")
 labkey$inventoryid <- as.numeric(labkey$inventoryid)
 
+# drop duplicate inventoryparentid's
+labkey_parentids <- labkey %>%
+  dplyr::group_by(inventoryparentid) %>%
+  dplyr::summarise(count = n()) %>%
+  dplyr::filter(count == 1)
+labkey <- filter(labkey, inventoryparentid %in% labkey_parentids$inventoryparentid)
+
+# spread `tests`
+tests2 <- tests %>%
+  dplyr::left_join(select(labkey, id, inventoryparentid), by=c("sample_id" = "id")) %>%
+  dplyr::select(name, value, inventoryparentid) %>%
+  tidyr::spread(name, value)
+
+# spread tests manually
+tests_numeric <- tests %>%
+  dplyr::left_join(select(labkey, id, inventoryparentid), by=c("sample_id" = "id")) %>%
+  dplyr::group_by(inventoryparentid) %>%
+  dplyr::summarise(
+    micro = any(!is.na(value[name=="aerobic_bacteria"]))
+  )
+    
+    micro = (!is.na(aerobic_bacteria) | !is.na(yeast_and_mold) | !is.na(coliforms) |
+               !is.na(bile_tolerant) | !is.na(e_coli_and_salmonella)),
+    moisture = !is.na(moisture),
+    solvent = !is.na(residual_solvent)
+  )
 
 # get names from categorization function -----
 # first get list/df of inhalantnames
@@ -84,4 +110,13 @@ km.out <- kmeans(extract.train, 5, nstart = 20)
 # mclust ----
 library(mclust)
 extract.clust = Mclust(extract.train[, 2:10], G = 5)
+
+# random forests -------
+library(randomForest)
+extracts.rf <- randomForest(inhalant_gen ~ name + received_test + failure + lab_invname + price + 
+                              retail_invname + strain + CBD + Total, ntree=30, 
+                            data=extract.train, importance=TRUE)
+plot(road.rf)
+var.imp.road <- varImpPlot(road.rf)
+rownames(var.imp.road)[1:4]
 
