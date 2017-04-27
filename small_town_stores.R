@@ -9,6 +9,7 @@ pullman_store_sales <- dispensing %>%
 write.table(pullman_store_sales, file="../data/Dec2016/cleaned/samples/pullman_store_sales.csv",
             row.names=F, sep=",")
 
+pullman_store_sales <- read.csv("../data/Dec2016/cleaned/samples/pullman_store_sales.csv", sep=",", header=T)
 
 pullman_store_sales %>%
   group_by(saletime) %>%
