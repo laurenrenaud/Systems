@@ -256,6 +256,11 @@ retail.byquarter.all %>%
        y="Retail Price Per Gram") + 
   theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
 
+
+
+
+red_pallette <- colorRampPalette(c("#ffffe5", "firebrick"), alpha = TRUE)(10)
+
 retail.byquarter.bytype %>%
   dplyr::filter(quarter!="other") %>%
   dplyr::filter(retail_typename == "Usable Marijuana") %>%
@@ -263,14 +268,18 @@ retail.byquarter.bytype %>%
   xlim(0, 8) + ylim(0, 25) +
   geom_abline(intercept = 0, slope = 1, color="grey23", size=0.75, linetype="dashed") +
   geom_abline(intercept = 0, slope = 3, color="grey23", size=1, linetype="dotted") +
-  geom_point(aes(color=quarter), alpha=.9, size=3) + 
-  scale_colour_brewer(palette = "Reds") +
+  geom_point(aes(color=quarter), alpha=.9, size=4) + 
+  #scale_colour_brewer(palette = "Reds") +
+  scale_color_manual(values=red_pallette) +
   annotate("text", x = 6, y = 3.5, label = "1:1 Ratio", colour="black") + 
   annotate("text", x = 5, y = 19, label = "3:1 Ratio", colour="black") + 
-  labs(title="Relationship Between Processor and Retail Prices \nUsable Marijuana",
+  labs(title="Usable Marijuana",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
   theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
+
+#red_pallette2 <- red_pallette[4:10] 
+red_pallette2 <- colorRampPalette(c("#ffffe5", "firebrick"), alpha = TRUE)(7)
 
 retail.byquarter.bytype %>%
   dplyr::filter(retail_typename == "Marijuana Extract for Inhalation",
@@ -283,13 +292,36 @@ retail.byquarter.bytype %>%
   #geom_smooth(color="gold2", method = "lm") +
   annotate("text", x = 20, y = 15, label = "1:1 Ratio", colour="black") + 
   annotate("text", x = 14, y = 55, label = "3:1 Ratio", colour="black") + 
-  geom_point(aes(color=quarter), alpha=.9, size=3) + 
+  geom_point(aes(color=quarter), alpha=.9, size=4) + 
   #facet_wrap("retail_typename") +
-  scale_colour_brewer(palette = "Reds") +
-  labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation",
+  #scale_colour_brewer(palette = "Reds") +
+  scale_color_manual(values=red_pallette2) +
+  labs(title="Extracts for Inhalation",
        x="Processor's Price Per Gram",
        y="Retail Price Per Gram") + 
   theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
+
+
+# retail.byquarter.bytype %>%
+#   dplyr::filter(
+#     quarter!="2014 Q3", quarter!="2014 Q4",
+#     #retail_typename == "Marijuana Extract for Inhalation",
+#     !is.na(avg_retailpricecpergram), !is.na(avg_wholesalepricepergram), quarter!="other") %>%
+#   ggplot(aes(x=avg_wholesalepricepergram, y=avg_retailpricecpergram)) +
+#   #geom_point(alpha=0.25, color="darkgreen") +
+#   xlim(0, 25) + ylim(0, 65) +
+#   geom_abline(intercept = 0, slope = 1, color="grey23", size=0.75, linetype="dashed") +
+#   geom_abline(intercept = 0, slope = 3, color="grey23", size=1, linetype="dotted") +
+#   #geom_smooth(color="gold2", method = "lm") +
+#   annotate("text", x = 20, y = 15, label = "1:1 Ratio", colour="black") +
+#   annotate("text", x = 14, y = 55, label = "3:1 Ratio", colour="black") +
+#   geom_point(aes(color=quarter), alpha=.9, size=3) +
+#   facet_wrap("retail_typename") +
+#   scale_colour_brewer(palette = "Reds") +
+#   labs(title="Relationship Between Processor and Retail Prices \nExtract for Inhalation",
+#        x="Processor's Price Per Gram",
+#        y="Retail Price Per Gram") +
+#   theme(panel.background = element_rect(fill = "darkgray"), panel.grid.major = element_line(colour = "azure2"))
 
 
 # inhalants by classifications
