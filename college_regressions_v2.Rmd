@@ -214,7 +214,6 @@ inhaltypes <- pullmanUrbanRestofState_inhalants %>%
   dplyr::rename(`Inhalant Group` = inhal_group)
 
 ggplot() +
-  # different regression lines for spring, summer, and fall
   geom_smooth(data=subset(inhaltypes, saledate >= "2016-01-01" & saledate <="2016-12-31" &
                             towntype!="Airway Heights" & towntype!="Ellensburg"),
               mapping = aes(x=saledate, y=perc_group, color=`Inhalant Group`),

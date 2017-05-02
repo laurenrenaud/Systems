@@ -1153,7 +1153,7 @@ grid.arrange(pullNCNU_usable, pullNCNU_edible, pullNCNU_extract, ncol=3)
 
 ### Inhalant types in Pullman
 
-```{r perc_city_noncollege_Pullman}
+```{r perc_city_noncollege_Pullman2}
 
 inhaltypes_pullman <- daily_aggregate_inhaltypes_byTownType %>%
   dplyr::filter(towntype_Pullman=="Pullman") %>%
