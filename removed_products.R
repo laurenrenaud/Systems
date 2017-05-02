@@ -211,7 +211,7 @@ removedproduct %>%
 
 # 1: convert strings into dataframe
 # and need to include which "line" it comes from
-removed.df <- data_frame(line=1:36466, text = removereasons)
+removed.df <- data_frame(line=1:39773, text = removereasons)
 # 2: use tidytext to convert into one-token-per-document-per-row.
 library(tidytext)
 library(stringr)

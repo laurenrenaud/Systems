@@ -1,6 +1,11 @@
-library(dplyr)
-library(ggplot2)
 library(readr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(RColorBrewer)
+library(tidyr)
+library(topicmodels)
+options(scipen=4)
 
 # how to build extracts file ----------
 # dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
@@ -20,6 +25,23 @@ library(readr)
 #                                  price),
 #                 price_per_gram = price_x/usableweight) %>%
 #   dplyr::select(-(saledate), -(price))
+# 
+# # get names from categorization function -----
+# # first get list/df of inhalantnames
+# inhalantnames <- as.data.frame(unique(extracts$productname))
+# # rename column so we can call it
+# colnames(inhalantnames) <- "productname"
+# # bringing in classification function
+# source("categorization_function.R")
+# inhalantnames <- inhalantnames %>%
+#   filter(!is.na(productname)) %>%
+#   rowwise() %>%
+#   mutate(inhalant_type = categorizeNames(productname),
+#          inhalant_gen = groupProductTypes(inhalant_type),
+#          inhalant_genOil = groupProductTypesOilSep(inhalant_type))
+# # join classified inhalantnames back to dispening df
+# extracts$productname <- as.factor(extracts$productname)
+# extracts <- left_join(extracts, inhalantnames, by="productname")
 # 
 # write.table(extracts, file="../data/Dec2016/cleaned/samples/extracts.csv", sep=",", row.names=F)
 
@@ -51,23 +73,6 @@ potency_tidy <- potency %>%
   dplyr::ungroup() %>%
   dplyr::select(-(sample_id))
 
-
-# get names from categorization function -----
-# first get list/df of inhalantnames
-inhalantnames <- as.data.frame(unique(extracts$productname))
-# rename column so we can call it
-colnames(inhalantnames) <- "productname"
-# bringing in classification function
-source("categorization_function.R")
-inhalantnames <- inhalantnames %>%
-  filter(!is.na(productname)) %>%
-  rowwise() %>%
-  mutate(inhalant_type = categorizeNames(productname),
-         inhalant_gen = groupProductTypes(inhalant_type),
-         inhalant_genOil = groupProductTypesOilSep(inhalant_type))
-# join classified inhalantnames back to dispening df
-extracts$productname <- as.factor(extracts$productname)
-extracts <- left_join(extracts, inhalantnames, by="productname")
 
 tests <- tests %>%
   dplyr::left_join(select(labkey, sample_id = id, inventoryparentid), by="sample_id") %>%
@@ -117,16 +122,20 @@ tests_numeric <- tests_numeric %>%
 # it's also missing from 13% of the extracts df
 # price is missing from 5%
 # potency is missing from 5%
-tests_numeric <- dplyr::filter(tests_numeric, !(is.na(price_per_gram)), !(is.na(CBD)), !(is.na(Total)),
+tests_numeric <- dplyr::filter(tests_numeric, !(is.na(price_per_gram)), !(is.na(CBD)), 
+                               !(is.na(Total)),
                                # calculation for price per gram will be more accurate
                                price_per_gram>0)
 
-tests_numeric$inhalant_gen <- as.factor(tests_numeric$dplyr::)
+tests_numeric$inhalant_gen <- as.factor(tests_numeric$inhalant_gen)
 tests_numeric$inhalant_type <- as.factor(tests_numeric$inhalant_type)
 tests_numeric$lab_invtype <- as.factor(tests_numeric$lab_invtype)
 
+# uncategorized df -----
+uncategorized <- filter(tests_numeric, inhalant_gen=="Uncategorized")
 
-# exploring lab / processor types ------
+
+# lab types heat maps ------
 labtypes_heat <- tests_numeric %>%
   dplyr::group_by(lab_invtype) %>%
   dplyr::mutate(lab_type_count = n()) %>%
@@ -188,12 +197,6 @@ outliers <- filter(tests.train,
                    cluster==3)
 tests.train <- filter(tests.train, !(inventoryparentid %in% outliers$inventoryparentid))
 
-
-
-
-
-
-
 km.out <- kmeans(tests.train[, 2:8], 4, nstart = 20)
 # join clusters back to df
 tests.train$cluster <- km.out$cluster
@@ -204,7 +207,7 @@ table(tests.train$cluster, tests.train$lab_invtype)
 
 
 
-# k nearest neighbors
+# k nearest neighbors ---------
 library(class)
 # Randomly select 20% of the data to be held out for model validation
 train <- sample(1:nrow(tests_numeric), 
@@ -243,44 +246,109 @@ table(tests_numeric$inhalant_gen)
 
 
 
-
-
-
-
-
-
-
-
-
-
-# Randomly select 20% of the data to be held out for model validation -------
-train <- sample(1:nrow(extract_results.sample), 
-                round(0.2 * nrow(extract_results.sample)))
-test <- setdiff(1:nrow(extract_results.sample), train)
-
-extract.train <- extract_results.sample[train,]
-extract.test <- extract_results.sample[test,]
-train.def <- extract_results.sample$inhalant_gen[train]
-test.def <- extract_results.sample$inhalant_gen[test]
-
-
-
-
-
-# k means -----
-km.out <- kmeans(extract.train, 5, nstart = 20)
-
-
 # mclust ----
 library(mclust)
 extract.clust = Mclust(extract.train[, 2:10], G = 5)
 
-# random forests -------
-library(randomForest)
-extracts.rf <- randomForest(inhalant_gen ~ name + received_test + failure + lab_invname + price + 
-                              retail_invname + strain + CBD + Total, ntree=30, 
-                            data=extract.train, importance=TRUE)
-plot(road.rf)
-var.imp.road <- varImpPlot(road.rf)
-rownames(var.imp.road)[1:4]
 
+# LDA text -------
+
+# attemping LDA : Latent Dirichlet allocation
+# http://tidytextmining.com/topicmodeling.html
+# http://tidytextmining.com/tidytext.html
+
+# 1: convert strings into dataframe
+# and need to include which "line" it comes from
+#productnames.df <- data_frame(line=1:nrow(extracts), text = extracts$productname)
+# 2: use tidytext to convert into one-token-per-document-per-row.
+library(tidytext)
+library(stringr)
+# this then includes a variable saying which line it initially came from
+# removed.df <- removed.df %>%
+#   unnest_tokens(word, text)
+
+names.df <- extracts %>%
+  dplyr::filter(!is.na(productname)) %>%
+  dplyr::mutate(linenumber = row_number())
+# sampling to run on smaller df
+# sample.list <- sample(names.df$dispensingid, 200000, replace=F)
+# names.sample <- dplyr::filter(names.df, dispensingid %in% sample.list)
+# names.sample$productname <- as.character(names.sample$productname)
+
+# or sampling only uncategorized
+sample.list <- sample(names.df$dispensingid[names.df$inhalant_gen=="Uncategorized"],
+                      200000, replace=F)
+names.sample <- dplyr::filter(names.df, dispensingid %in% sample.list)
+names.sample$productname <- as.character(names.sample$productname)
+
+names.tidy <- names.sample %>%
+  unnest_tokens(word, productname)
+
+# remove stop words (but should check those)
+stop_words <- as.data.frame(c("gram", "grams", "g", "mg", "oz", "0.5g", "1g", "5g",
+                              "500mg", 0:9))
+colnames(stop_words) <- "word"
+names.tidy <- names.tidy %>%
+  anti_join(stop_words)
+
+# create DocumentTermMatrix
+names.docmatrix <- names.tidy %>%
+  select(document = linenumber, term = word) %>%
+  group_by(document, term) %>%
+  summarise(count = n()) %>%
+  cast_dtm(document, term, count)
+
+ap_lda <- LDA(names.docmatrix, k = 6, control = list(seed = 1234))
+ap_topics <- tidy(ap_lda, matrix = "beta")
+
+ap_top_terms <- ap_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+ap_top_terms %>%
+  mutate(term = reorder(term, beta)) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+# ap_documents <- tidy(ap_lda, matrix = "gamma")
+# ap_documents %>%
+#   filter(topic==2) %>%
+#   arrange(desc(gamma))
+
+# word cloud uncategroized -----
+library(tm)
+library(SnowballC)
+library(wordcloud)
+# Load the data as a corpus
+inhal_names <- unique(uncategorized$productname)
+docs <- Corpus(VectorSource(inhal_names))
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "/")
+docs <- tm_map(docs, toSpace, "@")
+docs <- tm_map(docs, toSpace, "\\|")
+
+# Convert the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# Remove numbers
+docs <- tm_map(docs, removeNumbers)
+# Remove punctuations
+docs <- tm_map(docs, removePunctuation)
+# Eliminate extra white spaces
+docs <- tm_map(docs, stripWhitespace)
+
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words=300, random.order=TRUE, rot.per=0.4, 
+          colors=brewer.pal(12, "Paired"))
+
+# # without product "type" keywords
+# d.2 <- dplyr::filter(d, word !="cartridge" & word!="wax" & word!="vape" & word!="shatter" &
+#                        word!="cart" & word!="gram")
