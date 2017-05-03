@@ -219,7 +219,7 @@ tests.train <- classified[train, c(2:10, 12)]
 tests.test <- classified[test, c(2:10, 12)]
 train.def <- classified$inhalant_gen[train]
 test.def <- classified$inhalant_gen[test]
-knn.pred <- knn(tests.train, tests.test, train.def, k=5)
+knn.pred <- knn(tests.train, tests.test, train.def, k=4)
 
 # joining back to definitions
 classifed_predictions <- cbind(tests.test, knn.pred, test.def)
@@ -231,57 +231,73 @@ knn.pred <- knn(tests.train, uncat, train.def, k=5)
 uncat_predictions <- cbind(uncat, knn.pred, uncategorized$productname)
 head(uncat_predictions)
 
-features <- function(df, m = 1){
-  nf <- ncol(df) -1 # number of input features
-  idx <- 1: nf  # column indices of input features
-  output <- df[, ncol(df)]  # output column
-  outputH <- entropy(output) # entropy for output
-  idx.list <- combn(idx, m) # matrix storing all combinations of size m from idx
-  IG.res <-NULL # output data frame
-  # iterate through all combinations of index 
-  for (ii in 1:ncol(idx.list)){
-    this.idx <- idx.list[, ii]  
-    input.df <- data.frame(df[,this.idx]) 
-    # create a vector where each element is a concatenation of all values of a row of a data frame
-    this.input <- apply(input.df, 1, paste, collapse='') 
-    # create a new feature name which is a concatenation of feature names in a feature set
-    this.input.names <- paste(names(df)[this.idx], collapse=' ')    
-    this.IG <-info.gain(this.input,output) # information gain
-    this.RIG <- this.IG / outputH # relative information gain
-    this.res <- data.frame(feature = this.input.names, IG = this.IG, RIG = this.RIG) #assemble a df
-    IG.res <- rbind(IG.res, this.res) # concatenate the results    
+# trying to find variable importance
+knn.pred$results$Rsquared
+
+# trying to plot accuracy
+# from: https://rpubs.com/potentialwjy/MachineLearning3
+# Load the class package, define range and accs
+library(class)
+range <- 1:round(0.2 * nrow(tests.train))
+accs <- rep(0, length(range))
+
+for (k in range) {
+  # Make predictions using knn: pred
+  pred <- knn(tests.train, tests.test, train.def, k=k)
+  # Construct the confusion matrix: conf
+  conf <- table(test.def, pred)
+  # Calculate the accuracy and store it in accs[k]
+  accs[k] <- sum(diag(conf)) / sum(conf)
   }
-  sorted <- IG.res[order(-IG.res$IG), ] # sort the result by information gain in a descending order
-  return (sorted)
-}
+
+# Plot the accuracies. Title of x-axis is "k".
+plot(range, accs, xlab="k")
 
 
-#returns IG for numerical variables.
-IG_numeric <- function(data, feature, target, bins=4) {
-  #Strip out rows where feature is NA
-  data<-data[!is.na(data[,feature]),]
-  #compute entropy for the parent
-  e0<-entropy(data[,target])
-  
-  data$cat<-cut(data[,feature], breaks=bins, labels=c(1:bins))
-  
-  dd_data<-ddply(data, "cat", here(summarise), 
-                 e=entropy(get(target)), 
-                 N=length(get(target)),
-                 min=min(get(feature)),
-                 max=max(get(feature))
-  )
-  
-  #calculate p for each value of feature
-  dd_data$p<-dd_data$N/nrow(data)
-  #compute IG
-  IG<-e0-sum(dd_data$p*dd_data$e)
-  
-  return(IG)
-}
 
+# features <- function(df, m = 1){
+#   nf <- ncol(df) -1 # number of input features
+#   idx <- 1: nf  # column indices of input features
+#   output <- df[, ncol(df)]  # output column
+#   outputH <- entropy(output) # entropy for output
+#   idx.list <- combn(idx, m) # matrix storing all combinations of size m from idx
+#   IG.res <-NULL # output data frame
+#   # iterate through all combinations of index
+#   for (ii in 1:ncol(idx.list)){
+#     this.idx <- idx.list[, ii]
+#     input.df <- data.frame(df[,this.idx])
+#     # create a vector where each element is a concatenation of all values of a row of a data frame
+#     this.input <- apply(input.df, 1, paste, collapse='')
+#     # create a new feature name which is a concatenation of feature names in a feature set
+#     this.input.names <- paste(names(df)[this.idx], collapse=' ')
+#     this.IG <-info.gain(this.input,output) # information gain
+#     this.RIG <- this.IG / outputH # relative information gain
+#     this.res <- data.frame(feature = this.input.names, IG = this.IG, RIG = this.RIG) #assemble a df
+#     IG.res <- rbind(IG.res, this.res) # concatenate the results
+#   }
+#   sorted <- IG.res[order(-IG.res$IG), ] # sort the result by information gain in a descending order
+#   return (sorted)
+# }
+# 
+# features(classifed_predictions, m=12)
 
-IG_numeric(data, feature, target, bins=4)
+# 
+# 
+# #returns IG for categorical variables.
+# IG_cat<-function(data,feature,target){
+#   #Strip out rows where feature is NA
+#   data<-data[!is.na(data[,feature]),] 
+#   #use ddply to compute e and p for each value of the feature
+#   dd_data<-ddply(data, feature, here(summarise), e=entropy(get(target)), N=length(get(target)))
+#   #compute entropy for the parent
+#   e0<-entropy(data[,target])
+#   #calculate p for each value of feature
+#   dd_data$p<-dd_data$N/nrow(data)
+#   #compute IG
+#   IG<-e0-sum(dd_data$p*dd_data$e)
+#   
+#   return(IG)
+# }
 
 
 
@@ -416,55 +432,93 @@ wordcloud(words = d$word, freq = d$freq, min.freq = 1,
 
 
 # sankey of classification --------
-library(riverplot)
 
-makeRivPlot <- function(data, var1, var2) {
-  require(dplyr)          # Needed for the count function
-  require(riverplot)      # Does all the real work
-  require(RColorBrewer)   # To assign nice colours
-  
-  names1 <- levels(data[, var1])
-  names2 <- levels(data[, var2])
-  
-  var1   <- as.numeric(data[, var1])
-  var2   <- as.numeric(data[, var2])
-  
-  edges  <- data.frame(var1, var2 + max(var1, na.rm = T))
-  edges  <- count(edges)
-  
-  colnames(edges) <- c("N1", "N2", "Value")
-  
-  nodes <- data.frame(
-    ID     = c(1:(max(var1, na.rm = T) + 
-                    max(var2, na.rm = T))),  
-    x      =  c(rep(1, times = max(var1, na.rm = T)), 
-                rep(2, times = max(var2, na.rm = T))),       
-    labels = c(names1, names2) , 
-    col    = c(brewer.pal(max(var1, na.rm = T), "Set1"), 
-               brewer.pal(max(var2, na.rm = T), "Set1")),
-    stringsAsFactors = FALSE)
-  
-  nodes$col <- paste(nodes$col, 95, sep = "")
-  
-  river <- makeRiver(nodes, edges)
-  
-  return(plot(river))
-}
+sankey.df <- filter(extracts, !is.na(inhalant_gen))
+sankey.df$inhalant_gen <- as.character(sankey.df$inhalant_gen)
+sankey.df$inhalant_type <- as.character(sankey.df$inhalant_type)
+edges <- sankey.df %>%
+  # renaming uncategorized to unknown
+  # because the riverplot can't handle matching names
+  dplyr::mutate(inhalant_type2 = ifelse(inhalant_type=="Uncategorized", "Unknown", inhalant_type)) %>%
+  dplyr::group_by(inhalant_gen, inhalant_type2) %>%
+  dplyr::summarise(
+    #total_products = "All Products",
+    count_products = n()
+  ) %>%
+  as.data.frame()
 
-data <- data.frame("ID" = c(1:500), 
-                   "A"  = factor(sample(c(1:4), 500, replace = T), 
-                                 labels = c("A", "B", "C", "D")),
-                   "B"  = factor(sample(c(1:3), 500, replace = T), 
-                                 labels = c("Big", "Mid", "Small")))
+colnames(edges) <- c("N1", "N2", "Value")
+
+nodes <- data.frame(
+  ID = c(unique(edges$N1), unique(edges$N2)), stringsAsFactors= FALSE,
+  col = c(rep("#e8008077", length(unique(sankey.df$inhalant_type))), 
+          rep("#4a7aff77", length(unique(sankey.df$inhalant_gen))))
+)
+
+riv <- makeRiver(nodes, edges, 
+                 node_xpos=c(rep.int(1,length(unique(edges$N1))), 
+                             rep.int(2,length(unique(edges$N2)))))
+
+# style the riverplot
+riv.style <- riverplot::default.style()
+riv.style$textcex <- 0.7
+riv.style$srt <- 0
+riv.style$nodestyle <- "regular"
+riv.style$textcol <- "#39383a"
+#riv.style$edgecol$col <- "#FF0000"
+#riv.style$colorRampPaletteAlpha( c( "#FF000033", "#00FF0099" ) )( 5 )
+plot(riv, default_style=riv.style, node_margin=0.2, plot_area=1, xscale=0.92)
+text(-.1, .5, "Product Groupings", col= "#333333", cex=0.8, srt = 90)
+text(1, .5, "Product Types", col= "#333333", srt = 270, cex=0.8)
 
 
-data <- data.frame("ID" = c(1:500), 
-                   "A"  = factor(sample(c(1:4), 500, replace = T), 
-                                 labels = c("A", "B", "C", "D")),
-                   "B"  = factor(sample(c(1:3), 500, replace = T), 
-                                 labels = c("Big", "Mid", "Small")))
 
-makeRivPlot(data, "A", "B")
+# # adding more edges and nodes
+# sankey.df <- filter(extracts, !is.na(inhalant_gen))
+# sankey.df$inhalant_gen <- as.character(sankey.df$inhalant_gen)
+# sankey.df$inhalant_type <- as.character(sankey.df$inhalant_type)
+# edges <- sankey.df %>%
+#   # renaming uncategorized to unknown
+#   # because the riverplot can't handle matching names
+#   dplyr::mutate(inhalant_type2 = ifelse(inhalant_type=="Uncategorized", "Unknown", inhalant_type)) %>%
+#   dplyr::group_by(inhalant_gen) %>%
+#   dplyr::mutate(count_groupings = n()) %>%
+#   dplyr::group_by(inhalant_gen, inhalant_type2) %>%
+#   dplyr::summarise(
+#     all_products = "all_products",
+#     count_groupings = count_groupings[1],
+#     count_products = n()
+#   ) %>%
+#   as.data.frame()
+# 
+# colnames(edges) <- c("N2", "N3", "N1", "Value_1", "Value_2")
+# # reorder columns
+# edges <- edges[, c("N1", "N2", "Value_1", "N3", "Value_2")]
+# 
+# nodes <- data.frame(
+#   ID = c(unique(edges$N1), unique(edges$N2), unique(edges$N3)), stringsAsFactors= FALSE,
+#   col = c(rep("blue"),
+#           rep("#e8008077", length(unique(sankey.df$inhalant_type))), 
+#           rep("#4a7aff77", length(unique(sankey.df$inhalant_gen))))
+# )
+# 
+# riv <- makeRiver(nodes, edges, 
+#                  node_xpos=c(rep.int(1,length(unique(edges$N1))), 
+#                              rep.int(2,length(unique(edges$N2))), 
+#                              rep.int(3,length(unique(edges$N3)))))
+# 
+# # style the riverplot
+# riv.style <- riverplot::default.style()
+# riv.style$textcex <- 0.7
+# riv.style$srt <- 0
+# riv.style$nodestyle <- "regular"
+# riv.style$textcol <- "#39383a"
+# #riv.style$edgecol$col <- "#FF0000"
+# #riv.style$colorRampPaletteAlpha( c( "#FF000033", "#00FF0099" ) )( 5 )
+# plot(riv, default_style=riv.style, node_margin=0.2, plot_area=1, xscale=0.92)
+# text(-.18, .5, "Product Groupings", col= "#333333", cex=0.8, srt = 90)
+# text(1, .5, "Product Types", col= "#333333", srt = 270, cex=0.8)
 
-x <- riverplot.example()
-plot( x )
+
+
+
