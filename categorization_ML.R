@@ -133,6 +133,7 @@ tests_numeric$lab_invtype <- as.factor(tests_numeric$lab_invtype)
 
 # uncategorized df -----
 uncategorized <- filter(tests_numeric, inhalant_gen=="Uncategorized")
+classified <- filter(tests_numeric, inhalant_gen!="Uncategorized", !is.na(inhalant_gen))
 
 
 # lab types heat maps ------
@@ -210,21 +211,77 @@ table(tests.train$cluster, tests.train$lab_invtype)
 # k nearest neighbors ---------
 library(class)
 # Randomly select 20% of the data to be held out for model validation
-train <- sample(1:nrow(tests_numeric), 
-                round(0.2 * nrow(tests_numeric)))
-test <- setdiff(1:nrow(tests_numeric), train)
+train <- sample(1:nrow(classified), 
+                round(0.2 * nrow(classified)))
+test <- setdiff(1:nrow(classified), train)
 
-tests.train <- tests_numeric[train, c(2:10, 12)]
-tests.test <- tests_numeric[test, c(2:10, 12)]
-train.def <- tests_numeric$inhalant_gen[train]
-test.def <- tests_numeric$inhalant_gen[test]
+tests.train <- classified[train, c(2:10, 12)]
+tests.test <- classified[test, c(2:10, 12)]
+train.def <- classified$inhalant_gen[train]
+test.def <- classified$inhalant_gen[test]
 knn.pred <- knn(tests.train, tests.test, train.def, k=5)
-100 * sum(test.def == knn.pred)/100 
+
+# joining back to definitions
+classifed_predictions <- cbind(tests.test, knn.pred, test.def)
+table(classifed_predictions$knn.pred, classifed_predictions$test.def)
+
+# using model on unclassified
+uncat <- uncategorized[, c(2:10, 12)]
+knn.pred <- knn(tests.train, uncat, train.def, k=5)
+uncat_predictions <- cbind(uncat, knn.pred, uncategorized$productname)
+head(uncat_predictions)
+
+features <- function(df, m = 1){
+  nf <- ncol(df) -1 # number of input features
+  idx <- 1: nf  # column indices of input features
+  output <- df[, ncol(df)]  # output column
+  outputH <- entropy(output) # entropy for output
+  idx.list <- combn(idx, m) # matrix storing all combinations of size m from idx
+  IG.res <-NULL # output data frame
+  # iterate through all combinations of index 
+  for (ii in 1:ncol(idx.list)){
+    this.idx <- idx.list[, ii]  
+    input.df <- data.frame(df[,this.idx]) 
+    # create a vector where each element is a concatenation of all values of a row of a data frame
+    this.input <- apply(input.df, 1, paste, collapse='') 
+    # create a new feature name which is a concatenation of feature names in a feature set
+    this.input.names <- paste(names(df)[this.idx], collapse=' ')    
+    this.IG <-info.gain(this.input,output) # information gain
+    this.RIG <- this.IG / outputH # relative information gain
+    this.res <- data.frame(feature = this.input.names, IG = this.IG, RIG = this.RIG) #assemble a df
+    IG.res <- rbind(IG.res, this.res) # concatenate the results    
+  }
+  sorted <- IG.res[order(-IG.res$IG), ] # sort the result by information gain in a descending order
+  return (sorted)
+}
 
 
+#returns IG for numerical variables.
+IG_numeric <- function(data, feature, target, bins=4) {
+  #Strip out rows where feature is NA
+  data<-data[!is.na(data[,feature]),]
+  #compute entropy for the parent
+  e0<-entropy(data[,target])
+  
+  data$cat<-cut(data[,feature], breaks=bins, labels=c(1:bins))
+  
+  dd_data<-ddply(data, "cat", here(summarise), 
+                 e=entropy(get(target)), 
+                 N=length(get(target)),
+                 min=min(get(feature)),
+                 max=max(get(feature))
+  )
+  
+  #calculate p for each value of feature
+  dd_data$p<-dd_data$N/nrow(data)
+  #compute IG
+  IG<-e0-sum(dd_data$p*dd_data$e)
+  
+  return(IG)
+}
 
 
-
+IG_numeric(data, feature, target, bins=4)
 
 
 
@@ -236,8 +293,12 @@ knn.pred <- knn(tests.train, tests.test, train.def, k=5)
 # random forests -------
 library(randomForest)
 extracts.rf <- randomForest(inhalant_gen ~ bacteria + bile + coliforms + ecoli + yeast + moisture +
-                              solvent + price + CBD + Total, ntree=30, 
-                            data=tests_numeric, importance=TRUE)
+                              solvent + price_per_gram + CBD + Total, ntree=30, 
+                            data=classified, importance=TRUE)
+
+extracts.rf <- randomForest(inhalant_gen ~ bacteria + bile + coliforms + ecoli + yeast + moisture +
+                              solvent + price_per_gram + CBD + Total, ntree=30, 
+                            data=classified, importance=TRUE)
 plot(road.rf)
 var.imp.road <- varImpPlot(road.rf)
 rownames(var.imp.road)[1:4]
@@ -352,3 +413,58 @@ wordcloud(words = d$word, freq = d$freq, min.freq = 1,
 # # without product "type" keywords
 # d.2 <- dplyr::filter(d, word !="cartridge" & word!="wax" & word!="vape" & word!="shatter" &
 #                        word!="cart" & word!="gram")
+
+
+# sankey of classification --------
+library(riverplot)
+
+makeRivPlot <- function(data, var1, var2) {
+  require(dplyr)          # Needed for the count function
+  require(riverplot)      # Does all the real work
+  require(RColorBrewer)   # To assign nice colours
+  
+  names1 <- levels(data[, var1])
+  names2 <- levels(data[, var2])
+  
+  var1   <- as.numeric(data[, var1])
+  var2   <- as.numeric(data[, var2])
+  
+  edges  <- data.frame(var1, var2 + max(var1, na.rm = T))
+  edges  <- count(edges)
+  
+  colnames(edges) <- c("N1", "N2", "Value")
+  
+  nodes <- data.frame(
+    ID     = c(1:(max(var1, na.rm = T) + 
+                    max(var2, na.rm = T))),  
+    x      =  c(rep(1, times = max(var1, na.rm = T)), 
+                rep(2, times = max(var2, na.rm = T))),       
+    labels = c(names1, names2) , 
+    col    = c(brewer.pal(max(var1, na.rm = T), "Set1"), 
+               brewer.pal(max(var2, na.rm = T), "Set1")),
+    stringsAsFactors = FALSE)
+  
+  nodes$col <- paste(nodes$col, 95, sep = "")
+  
+  river <- makeRiver(nodes, edges)
+  
+  return(plot(river))
+}
+
+data <- data.frame("ID" = c(1:500), 
+                   "A"  = factor(sample(c(1:4), 500, replace = T), 
+                                 labels = c("A", "B", "C", "D")),
+                   "B"  = factor(sample(c(1:3), 500, replace = T), 
+                                 labels = c("Big", "Mid", "Small")))
+
+
+data <- data.frame("ID" = c(1:500), 
+                   "A"  = factor(sample(c(1:4), 500, replace = T), 
+                                 labels = c("A", "B", "C", "D")),
+                   "B"  = factor(sample(c(1:3), 500, replace = T), 
+                                 labels = c("Big", "Mid", "Small")))
+
+makeRivPlot(data, "A", "B")
+
+x <- riverplot.example()
+plot( x )
