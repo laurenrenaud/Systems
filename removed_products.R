@@ -17,7 +17,12 @@ loc.simp <- locations %>%
 
 # get list of all reasons given so we can look at these for
 # text mining later
-removereasons <- unique(inventory$removereason)
+removereasons <- as.data.frame(unique(inventory$removereason))
+closed <- unique(locations$location_id[locations$status=="CLOSED (PERMANENT)"])
+removed_closed <- inventory %>%
+  dplyr::filter(location %in% closed) %>%
+  dplyr::select(removereason)
+removed_closed <- as.data.frame(unique(removed_closed$removereason))
 #write(removereasons, file="../data/Dec2016/cleaned/testing/removereasons.txt")
 # same specifically for this one store
 removereasons_268 <- unique(inventory$removereason[inventory$location==268])

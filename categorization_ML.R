@@ -48,6 +48,7 @@ options(scipen=4)
 # pull in data -------
 extracts <- readr::read_csv("../data/Dec2016/cleaned/samples/extracts.csv")
 extracts$inventoryparentid <- as.numeric(extracts$inventoryparentid)
+extracts$sample_id <- as.numeric(extracts$sample_id)
 potency <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_potency_analysis.csv")
 micro <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_micro_screening.csv")
 moisture <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_moisture_content.csv")
@@ -106,15 +107,30 @@ lab_invtypes <- labkey %>%
   left_join(inv_types, by="inventorytype") %>%
   select(-(inventorytype), lab_invtype = inv_type_name)
 
-# joining to the extracts df results in an increase in tests_numeric from
-# ~150k entries to ~2.5 million, which makes sense because a particular 
-# inventoryid may be linked to multiple retail products
-tests_numeric <- tests_numeric %>%
+
+
+
+
+
+# trying going from extracts to labs
+tests_extracts <- extracts %>%
+  dplyr::select(inventoryparentid, price_x, price_per_gram,
+                inhalant_type, inhalant_gen, productname) %>%
+  dplyr::left_join(tests_numeric, by="inventoryparentid")
+
+# OR
+tests_extracts <- tests_numeric %>%
   dplyr::left_join(select(extracts, inventoryparentid, price_x, price_per_gram,
                           inhalant_type, inhalant_gen, productname),
                    by="inventoryparentid") 
+
+# testing
+sum(is.na(tests_extracts$price_per_gram)) / nrow(tests_extracts)
+sum(is.na(tests_extracts$Total)) / nrow(tests_extracts)
+sum(is.na(tests_numeric$Total)) / nrow(tests_numeric)
+
 # join the lab's inventory types back to the tests df
-tests_numeric <- tests_numeric %>%
+tests_extracts <- tests_extracts %>%
   dplyr::left_join(lab_invtypes, by="inventoryparentid") 
 
 
@@ -122,14 +138,14 @@ tests_numeric <- tests_numeric %>%
 # it's also missing from 13% of the extracts df
 # price is missing from 5%
 # potency is missing from 5%
-tests_numeric <- dplyr::filter(tests_numeric, !(is.na(price_per_gram)), !(is.na(CBD)), 
+tests_nomissing <- dplyr::filter(tests_extracts, !(is.na(price_per_gram)), !(is.na(CBD)), 
                                !(is.na(Total)),
                                # calculation for price per gram will be more accurate
                                price_per_gram>0)
 
-tests_numeric$inhalant_gen <- as.factor(tests_numeric$inhalant_gen)
-tests_numeric$inhalant_type <- as.factor(tests_numeric$inhalant_type)
-tests_numeric$lab_invtype <- as.factor(tests_numeric$lab_invtype)
+tests_nomissing$inhalant_gen <- as.factor(tests_nomissing$inhalant_gen)
+tests_nomissing$inhalant_type <- as.factor(tests_nomissing$inhalant_type)
+tests_nomissing$lab_invtype <- as.factor(tests_nomissing$lab_invtype)
 
 # uncategorized df -----
 uncategorized <- filter(tests_numeric, inhalant_gen=="Uncategorized")
@@ -158,7 +174,8 @@ labtypes_heat %>%
        y="Lab Type",
        x="Retail Type") +
   theme(panel.grid.major.y = element_blank(), panel.grid.major.x = element_blank(),
-        panel.background = element_rect(fill = "gray99"))
+        panel.background = element_rect(fill = "gray99"), 
+        axis.text.x = element_text(angle = 5, hjust = 0.8, vjust = 0.9))
 
 #limited to distribution of uncatergorized
 labtypes_heat %>%
@@ -230,9 +247,10 @@ uncat <- uncategorized[, c(2:10, 12)]
 knn.pred <- knn(tests.train, uncat, train.def, k=5)
 uncat_predictions <- cbind(uncat, knn.pred, uncategorized$productname)
 head(uncat_predictions)
+table(uncat_predictions$knn.pred)
 
 # trying to find variable importance
-knn.pred$results$Rsquared
+#knn.pred$results$Rsquared
 
 # trying to plot accuracy
 # from: https://rpubs.com/potentialwjy/MachineLearning3
