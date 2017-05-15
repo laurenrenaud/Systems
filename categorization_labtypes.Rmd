@@ -1,0 +1,340 @@
+---
+title: 'Classifying Extracts: Supply Chain Types'
+author: "Lauren Renaud & Krista Kinnard"
+date: "May 15, 2017"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+library(dplyr)
+library(readr)
+library(knitr)
+library(tidyr)
+options(scipen = 4)
+```
+
+```{r setup2, include=FALSE, cache=TRUE}
+
+# pull in & clean dfs ------
+# locatons
+locations <- read.csv("../data/Dec2016/cleaned/locations/all_locations.csv", sep=",", header=T)
+locations <- select(locations, location_id, name, city, loc_type = typesimp)
+
+# inventory
+inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
+inventory$inv_date <- as.Date(as.POSIXct(inventory$sessiontime, 
+                                            origin = "1970-01-01", tz="America/Los_Angeles"))
+inventory$sample_id <- as.numeric(inventory$sample_id)
+inventory$parentid <- as.numeric(inventory$parentid)
+# join to inventory types
+inventory.types <- read.csv("../data/Dec2016/cleaned/inventory_type.csv", sep=",", header=T)
+inventory <- inventory %>%
+  # get inventory types
+  left_join(inventory.types, by="inventorytype") %>%
+  # get location types
+  left_join(locations, by=c("location" = "location_id")) %>%
+  # drop other location variables
+  select(-(name), -(city))
+rm(inventory.types)
+
+# selected variables
+inv.select <- select(inventory, inventoryid = id, inv_strain = strain, parentid,
+                     inv_type_name, inventoryparentid, productname, sample_id,
+                     inv_location = location, inv_loctype = loc_type)
+
+# dispensing
+dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
+dispensing <- filter(dispensing, inventorytype==24)
+dispensing$saletime <- as.Date(as.POSIXct(dispensing$sessiontime, 
+                                           origin = "1970-01-01", tz="America/Los_Angeles"))
+dispens.select <- select(dispensing, dispensingid = id, retail_invid = inventoryid, retail_loc = location,
+                         sale_price = price, saletime)
+dispens.select <- dispens.select %>%
+  left_join(locations, by=c("retail_loc" = "location_id")) %>%
+  # drop other location variables
+  select(-(name), -(city))
+
+
+labkey <- readr::read_csv("../data/Dec2016/biotrackthc_labresults_samples.csv")
+labkey$inventoryid <- as.numeric(labkey$inventoryid)
+labkey <- labkey %>%
+  dplyr::left_join(inventory.types, by="inventorytype")
+
+
+## testing going back one more step then looking at product types
+inhalants.joined <- dispens.select %>%
+  # first get to retailer's inventory to get `parentid`
+  # as well as retail productname, retail strain
+  dplyr::left_join(inv.select, by=c("retail_invid" = "inventoryid")) %>%
+  # rename to inventory variables to clarify they are retail variables
+  rename(retail_strain = inv_strain, retail_parentid = parentid, retail_invtype = inv_type_name,
+         retail_invparentid = inventoryparentid, retail_prodname = productname, retail_sampId = sample_id,
+         retail_location = inv_location) %>%
+  # then use retailer's parentid to get to processor's inventoryid
+  left_join(inv.select, by=c("retail_parentid" = "inventoryid")) %>%
+  # then rename processor inventory variables
+  rename(process_strain = inv_strain, process_parentid = parentid,
+         process_invparentid = inventoryparentid, process_invtype = inv_type_name,
+         process_prodname = productname, process_sampleid = sample_id, process_loc = inv_location) %>%
+  # then use processors's parentid to get to one step further back inventoryid
+  # these variables will now be called "inv_variablename"
+  left_join(inv.select, by=c("process_invparentid" = "inventoryid"))
+
+
+
+
+# how to build extracts file ----------
+# dispensing <- readr::read_csv("../data/Dec2016/biotrackthc_dispensing.csv")
+# dispensing$saledate <- as.Date(as.POSIXct(dispensing$sessiontime,
+#                                          origin = "1970-01-01", tz="America/Los_Angeles"))
+# inventory <- readr::read_csv("../data/Dec2016/biotrackthc_inventory.csv")
+# 
+# extracts <- dispensing %>%
+#   # 24 is inventory type for extracts
+#   dplyr::filter(inventorytype==24) %>%
+#   dplyr::select(dispensingid = id, weight, inventoryid, price, usableweight, saledate) %>%
+#   dplyr::left_join(select(inventory, inventoryid = id, strain, productname,
+#                           inventoryparentid, sample_id),
+#                    by="inventoryid") %>%
+#   dplyr::mutate(price_x = ifelse(saledate >= "2015-07-01",
+#                                  price*1.37,
+#                                  price),
+#                 price_per_gram = price_x/usableweight) %>%
+#   dplyr::select(-(saledate), -(price))
+# 
+# # get names from categorization function -----
+# # first get list/df of inhalantnames
+# inhalantnames <- as.data.frame(unique(extracts$productname))
+# # rename column so we can call it
+# colnames(inhalantnames) <- "productname"
+# # bringing in classification function
+# source("categorization_function.R")
+# inhalantnames <- inhalantnames %>%
+#   filter(!is.na(productname)) %>%
+#   rowwise() %>%
+#   mutate(inhalant_type = categorizeNames(productname),
+#          inhalant_gen = groupProductTypes(inhalant_type),
+#          inhalant_genOil = groupProductTypesOilSep(inhalant_type))
+# # join classified inhalantnames back to dispening df
+# extracts$productname <- as.factor(extracts$productname)
+# extracts <- left_join(extracts, inhalantnames, by="productname")
+# 
+# write.table(extracts, file="../data/Dec2016/cleaned/samples/extracts.csv", sep=",", row.names=F)
+
+# pull in data -------
+extracts <- readr::read_csv("../data/Dec2016/cleaned/samples/extracts.csv")
+extracts$inventoryparentid <- as.numeric(extracts$inventoryparentid)
+extracts$sample_id <- as.numeric(extracts$sample_id)
+
+
+# 5% of product names for inhalants are missing, which is ~ the same as in full inventory df
+# sum(is.na(inventory$productname[inventory$inventorytype==24])) / sum(inventory$inventorytype==24)
+# # 33% are missing for processors' product name
+# sum(is.na(inhalants.joined$inv_prodname)) / nrow(inhalants.joined)
+# # inventory type
+# # missing for 70 of joined inhalants (out of 6 million)
+# sum(is.na(inhalants.joined$retail_invtype)) / nrow(inhalants.joined)
+# 
+# dispeningtypes <- unique(dispensing$inventorytype[!is.na(dispensing$inventorytype)])
+
+
+# first get list/df of inhalantnames
+inhalantnames <- as.data.frame(unique(inhalants.joined$retail_prodname))
+# rename column so we can call it
+colnames(inhalantnames) <- "retail_prodname"
+
+# get a df that is for each unique inhalant name, the boolean values for categorizing
+inhalantnames <- inhalantnames %>%
+  dplyr::rowwise() %>%
+                 # boolean for cartridge
+  dplyr::mutate(cartridge = grepl("cart|vap|vc|pen|refill", retail_prodname, ignore.case = T),
+                # categorical
+                type = ifelse(
+                  grepl("BHO|butane", retail_prodname, ignore.case = T), "BHO",
+                  ifelse(grepl("CO2", retail_prodname, ignore.case = T), "CO2",
+                         ifelse(grepl("hash", retail_prodname, ignore.case = T), "hash",
+                                ifelse(grepl("hash", retail_prodname, ignore.case = T), "kief",
+                                       ifelse(grepl("bubble", retail_prodname, ignore.case = T), "bubble",
+                                              ifelse(grepl("shatter", retail_prodname, ignore.case = T), "shatter",
+                                                     ifelse(grepl("dab", retail_prodname, ignore.case = T), "dab",
+                                                            ifelse(grepl("resin", retail_prodname, ignore.case = T), "resin",
+                                                                   ifelse(grepl("wax", retail_prodname, ignore.case = T), "wax",
+                                                                          "other"))))))))
+                ),
+                # now booleans for each
+                oil = grepl("oil", retail_prodname, ignore.case = T),
+                CO2 = grepl("CO2", retail_prodname, ignore.case=T),
+                BHO = grepl("BHO|butane", retail_prodname, ignore.case = T),
+                hash = grepl("hash", retail_prodname, ignore.case = T),
+                kief = grepl("kief|keif", retail_prodname, ignore.case = T),
+                bubble = grepl("bubble", retail_prodname, ignore.case = T),
+                shatter = grepl("shatter", retail_prodname, ignore.case = T),
+                dab = grepl("dab", retail_prodname, ignore.case = T),
+                resin = grepl("resin", retail_prodname, ignore.case = T),
+                wax = grepl("wax", retail_prodname, ignore.case = T),
+                uncategorized = (!cartridge & !CO2 & !oil & !BHO & !kief & !bubble & !shatter & !dab & !resin & !wax),
+                uncat_notcart = (!CO2 & !oil & !BHO & !kief & !bubble & !shatter & !dab & !resin & !wax)
+  )
+
+# alternate method that creates a boolean for cartridge or not cartridge
+# and then another column for 'type' that's more specific
+# inhalantnames <- inhalantnames %>%
+#   dplyr::rowwise() %>%
+#   dplyr::mutate(cartridge = grepl("cart|vap|vc|pen|refill", productname, ignore.case = T),
+#                 type = ifelse(
+#                   grepl("BHO|butane", productname, ignore.case = T), "BHO",
+#                   ifelse(grepl("CO2", productname, ignore.case = T), "CO2",
+#                          ifelse(grepl("hash", productname, ignore.case = T), "hash",
+#                                 ifelse(grepl("hash", productname, ignore.case = T), "kief",
+#                                        ifelse(grepl("bubble", productname, ignore.case = T), "bubble",
+#                                               ifelse(grepl("shatter", productname, ignore.case = T), "shatter",
+#                                                      ifelse(grepl("dab", productname, ignore.case = T), "dab",
+#                                                             ifelse(grepl("resin", productname, ignore.case = T), "resin",
+#                                                                    ifelse(grepl("wax", productname, ignore.case = T), "wax",
+#                                                                           "other"))))))))
+#                 )
+#   )
+
+# join classified inhalantnames back to dispening df
+inhalants.joined$retail_prodname <- as.factor(inhalants.joined$retail_prodname)
+inhalants <- left_join(inhalants.joined, inhalantnames, by="retail_prodname")
+
+prelimCat <- inhalants %>%
+  dplyr::select(dispensingid, cartridge:uncategorized) %>%
+  tidyr::gather(keyword, status, cartridge:uncategorized) %>%
+  dplyr::group_by(keyword) %>%
+  dplyr::summarise(perc = round(sum(status==TRUE) / nrow(inhalants)*100,1),
+                   count = sum(status==TRUE)) %>%
+  dplyr::arrange(desc(perc))
+
+# trying to get count of how many products hit more than category
+# doing just based on names, not actual number of products
+# because full df was long to run, but could check again later
+num.keywords <- inhalantnames %>%
+  tidyr::gather(keyword, status, cartridge:uncategorized) %>%
+  dplyr::group_by(retail_prodname) %>%
+  dplyr::summarise(numCat = sum(status==TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(numCat) %>%
+  dplyr::summarise(distro_numkeywords = n(),
+                   perc_numkeywords = n() / nrow(inhalantnames))
+
+```
+
+# Processor Types
+
+It is possible to use the processors' inventory types to as a way to classify those that were "uncategorized", as well as to double check our above classifications.
+
+For about half of the inhalants, the processor also listed the product type as "Marijuana Extract for Inhalation", but for the other half, we have more detail about what went into the product. It also may be possible, if needed or useful, to try to go back one further step in the suppy chain to see what inventory types came before "Marijuana Extract for Inhalation" for a given product.
+
+```{r processortypes, warning=FALSE}
+# combinations of inventory types
+process.types <- inhalants %>%
+  # for some reason there is a very small number that are missing retail inventory type
+  # that didn't wokr in the join correctly
+  # screening these 70 out, but might investigate why
+  filter(!is.na(retail_invtype)) %>%
+  # group by processor's inventory type to get count and stats of the combinations
+  group_by(process_invtype) %>%
+  summarise(perc = round( n() / nrow(inhalants.joined)*100,1),
+            count = n()) %>%
+  arrange(desc(count))
+
+knitr::kable(process.types, col.names = c("Processor's Inventory Type - All Inhalants",
+                                          "Percent of Inhalants",
+                                          "Count"),
+               align=c("r", "r", "r"))
+
+
+process.types.uncategorized <- inhalants %>%
+  # same as above, but restricted to inhalants that are uncategorized
+  filter(!is.na(retail_invtype), uncategorized) %>%
+  # get count of number of uncategorized
+  mutate(total = n()) %>%
+  group_by(process_invtype) %>%
+  summarise(perc = round(n() / total[1] *100,1),
+            count = n()) %>%
+  arrange(desc(count))
+
+```
+
+More excitingly, we should be able to classify an additional `r round(sum(process.types.uncategorized$perc[process.types.uncategorized$process_invtype!="Marijuana Extract for Inhalation" & process.types.uncategorized$process_invtype!="Food Grade Solvent Extract" & !is.na(process.types.uncategorized$process_invtype)]),1)`% of the inhalants that we were not able to categorized by product name and keywords by looking at the processor's listed inventory types. This should allow us to get our uncategorized products down to about `r round(sum(inhalants$uncategorized, na.rm=T) / nrow(inhalants) * (sum(process.types.uncategorized$perc[process.types.uncategorized$process_invtype!="Marijuana Extract for Inhalation" & process.types.uncategorized$process_invtype!="Food Grade Solvent Extract"], na.rm=T)/100)*100,1)`% of inhalants.
+
+```{r processortypes2, warning=FALSE}
+
+knitr::kable(process.types.uncategorized, col.names = c("Processor's Inventory Type - Only Uncategorized",
+                                                        "Percent of Uncategorized",
+                                                        "Count"),
+             align=c("r", "r", "r"))
+
+```
+
+```{r heatmaps}
+
+labtypes <- extracts %>%
+  dplyr::select(sample_id, productname) %>%
+  dplyr::left_join(select(labkey, inventoryid, inv_type_name), by=c("sample_id" = "inventoryid"))
+
+
+# first get list/df of inhalantnames
+inhalantnames <- as.data.frame(unique(labtypes$productname))
+
+# rename column so we can call it
+colnames(inhalantnames) <- "productname"
+
+# bringing in classification function
+source("categorization_function.R")
+inhalantnames <- inhalantnames %>%
+  dplyr::filter(!is.na(productname)) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(inhalant_type = categorizeNames(productname),
+         inhalant_gen = groupProductTypesOilSep(productname))
+
+# join classified inhalantnames back to dispening df
+labtypes$productname <- as.factor(labtypes$productname)
+labtypes <- left_join(labtypes, inhalantnames, by="productname")
+
+# lab types heat maps ------
+labtypes_heat <- labkey %>%
+  dplyr::group_by(inv_type_name) %>%
+  dplyr::mutate(lab_type_count = n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(inv_type_name, inhalant_gen) %>%
+  dplyr::summarise(count = n(),
+                   `% in Lab Inv Type` = count / lab_type_count[1])
+
+# heat map of % of retail type that are of each lab inventory type
+# dropping uncategorized and flower to focus on testing if
+# these will help us categorize other things
+labtypes_heat %>%
+  dplyr::filter(lab_invtype!="Flower Lot", !is.na(lab_invtype), !is.na(inhalant_gen),
+                inhalant_gen!="Uncategorized", lab_invtype!="Marijuana Extract for Inhalation") %>%
+  ggplot(aes(x = inhalant_gen, y = lab_invtype)) + 
+  geom_tile(aes(fill = `% in Lab Inv Type`), colour = "white") +
+  scale_fill_gradient(low = "lightcyan2", high = "turquoise4") +
+  labs(title="Retail Type by Lab Type",
+       y="Lab Type",
+       x="Retail Type") +
+  theme(panel.grid.major.y = element_blank(), panel.grid.major.x = element_blank(),
+        panel.background = element_rect(fill = "gray99"), 
+        axis.text.x = element_text(angle = 5, hjust = 0.8, vjust = 0.9))
+
+#limited to distribution of uncatergorized
+labtypes_heat %>%
+  dplyr::filter(inhalant_gen=="Uncategorized") %>%
+  ggplot(aes(x = inhalant_gen, y = lab_invtype)) + 
+  geom_tile(aes(fill = `% in Lab Inv Type`), colour = "white") +
+  scale_fill_gradient(low = "lightcyan2", high = "turquoise4") +
+  labs(title="Retail Type by Lab Type",
+       y="Lab Type",
+       x="Retail Type") +
+  theme(panel.grid.major.y = element_blank(), panel.grid.major.x = element_blank(),
+        panel.background = element_rect(fill = "gray99"))
+
+```
+
